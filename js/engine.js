@@ -200,6 +200,7 @@
       p.hand = hands[i];
       p.ipoBlocks = 0;
       p.spy = null;
+      p.tip = null;
       p.ready = !!p.bot;
     });
     s.market = rest;
@@ -271,7 +272,9 @@
       }
       let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v), 0);
       const on = (sp) => s.plays.some((x) => x.sp === sp && x.tk === c.tk);
+      if (on('DOUBLE') && total) { total *= 2; mods.push('🎲 ×2'); }
       if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
+      if (on('CHARGE')) { total += 25; mods.push('🐂 +25'); }
       if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
       if (on('UPCAP') && total > 15) { total = 15; mods.push('🚧 max +15'); }
       if (on('LOWCAP') && total < -15) { total = -15; mods.push('🪂 max −15'); }
@@ -283,6 +286,17 @@
       if (on('DIVIDEND')) {
         for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * R.dividend; trade(s, p, 'div', c.tk, p.hold[c.tk], R.dividend); }
         row.note = `💰 Dividend ₹${R.dividend}/share paid`;
+      }
+      if (to < from) {
+        for (const x of s.plays.filter((y) => y.sp === 'NET' && y.tk === c.tk)) {
+          const p = player(s, x.pid);
+          const q = p && p.hold[c.tk];
+          if (!q) continue;
+          const back = q * (from - to);
+          p.cash += back;
+          trade(s, p, 'net', c.tk, q, from - to, 'Safety Net');
+          events.push(`🛟 ${p.avatar} ${p.name}'s Safety Net paid ₹${fmt(back)} on ${c.tk}.`);
+        }
       }
       if (to <= 0) {
         c.status = 'bankrupt';
@@ -426,8 +440,20 @@
         const o = rivals[Math.floor(rnd(s) * rivals.length)];
         p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
         trade(s, p, 'gold', null, 0, 0, `🔍 spied on ${o.name}`);
+      } else if (k.sp === 'TIP') {
+        p.tip = s.market.map((x) => Object.assign({}, x));
+        trade(s, p, 'gold', null, 0, 0, '🕵️ took an Insider Tip');
+      } else if (k.sp === 'TAX') {
+        const rich = s.players.filter((o) => o.id !== p.id).sort((a, b) => netWorth(s, b) - netWorth(s, a))[0];
+        const amt = Math.max(0, Math.min(rich.cash, Math.round(netWorth(s, rich) * 0.05 / 1000) * 1000));
+        rich.cash -= amt;
+        trade(s, p, 'gold', null, 0, 0, `🧾 Tax Raid on ${rich.name}`);
+        trade(s, rich, 'tax', null, 0, amt, `raided by ${p.name}`);
+      } else if (k.sp === 'LUCKY') {
+        p.cash += 100000;
+        trade(s, p, 'bonus', null, 0, 100000, 'Lucky Bonus');
       } else {
-        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name });
+        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id });
         trade(s, p, 'gold', c ? c.tk : null, 0, 0, `${def.icon} ${def.name}`);
       }
       log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
@@ -533,7 +559,7 @@
     for (const p of v.players) {
       p.handCount = p.hand.length;
       p.goldCount = p.gold.length;
-      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; }
+      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; p.tip = null; }
     }
     return v;
   };

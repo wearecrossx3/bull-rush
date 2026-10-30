@@ -65,7 +65,7 @@
   function show(id) {
     $$('.screen').forEach((s) => s.classList.toggle('active', s.id === 'scr-' + id));
     UI.screen = id;
-    if (id === 'title') { startRain(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
+    if (id === 'title') { startRain(); renderHome(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
   function startRain() {
     if (rainT) return;
@@ -120,9 +120,10 @@
     ['#pick-bots', '#pick-skill', '#pick-days', '#pick-len', '#pick-days-on', '#pick-len-on'].forEach((q) => chips($(q)));
     $('#btn-start').onclick = startOffline;
     $('#btn-continue').onclick = continueSaved;
-    const sndLbl = () => ($('#btn-sound').textContent = BR.sound.on ? '🔊 Sound on' : '🔇 Sound off');
-    $('#btn-sound').onclick = () => { BR.sound.toggle(); sndLbl(); BR.sfx('tap'); };
-    sndLbl();
+    $('#btn-quick').onclick = quickGame;
+    $('#btn-stats').onclick = () => { BR.sfx('tap'); statsModal(); };
+    $('#btn-settings').onclick = () => { BR.sfx('tap'); settingsModal(); };
+    applyPrefs();
     $('#btn-host').onclick = hostRoom;
     $('#btn-join').onclick = joinRoom;
     $('#howto-body').innerHTML = HOWTO;
@@ -156,6 +157,54 @@
     for (let i = 0; i < nBots; i++) roster.push({ id: 'bot' + i, name: names[i], bot: skill, avatar: avs[i], color: BR.COLORS[(i + 1) % 6] });
     const s = BR.createGame({ rounds: +$('#pick-days').dataset.val, turns: +$('#pick-len').dataset.val }, roster);
     begin(LocalCtrl(s, 'me'));
+  }
+
+  function quickGame() {
+    BR.sfx('tap');
+    $('#pick-bots').dataset.val = '3'; $('#pick-days').dataset.val = '6'; $('#pick-len').dataset.val = '3'; $('#pick-skill').dataset.val = 'normal';
+    startOffline();
+  }
+
+  // ---------------------------------------------------------------- home: profile, stats, settings, tips
+  const prefs = () => Object.assign({ vib: true, speed: 'normal' }, store.get('br.prefs', {}));
+  const SPEEDS = { relaxed: [2.6, 4.6], normal: [1.8, 3.6], fast: [0.7, 1.4] };
+  function applyPrefs() { R.botThink = SPEEDS[prefs().speed] || SPEEDS.normal; }
+  const stats = () => Object.assign({ played: 0, wins: 0, best: 0, podium: 0 }, store.get('br.stats', {}));
+  const TIPS = [
+    'Tip: watch the 📜 Trades list. A rival buying big usually holds good cards.',
+    'Tip: hold 20,000 shares to become Co-owner and cancel the worst minus card.',
+    'Tip: a 🛟 Safety Net plus a big holding is a fearless combo.',
+    'Tip: cheap stocks crash to ₹0 fast. Spread your money if your cards are mixed.',
+    'Tip: borrow before a sure rise, repay right after. Interest is 5% per round.',
+    'Tip: reach ₹1 Cr and you can list your own company.',
+    'Tip: 🕵️ Insider Tip shows the hidden market cards nobody else can see.',
+    'Tip: tap any player to see what they own and their latest moves.',
+  ];
+  function renderHome() {
+    const pr = store.get('br.profile', { name: 'Trader', avatar: BR.AVATARS[0] });
+    const st = stats();
+    $('#profile-strip').innerHTML = `<span class="ps-av">${esc(pr.avatar || '🦁')}</span><span class="ps-name"><b>${esc(pr.name || 'Trader')}</b><small>${st.played ? `${st.wins} wins · ${st.played} games` : 'New trader'}</small></span>${st.best ? `<span class="ps-best"><small>BEST</small>${rs(st.best)}</span>` : ''}`;
+    $('#tip-line').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+  }
+  function statsModal() {
+    const st = stats();
+    const rate = st.played ? Math.round(st.wins / st.played * 100) : 0;
+    openModal('stats', `<h2>🏆 Your stats<button class="x" data-m="close">✕</button></h2>
+      <div class="stat-grid">
+        <div><small>Games played</small><b>${st.played}</b></div><div><small>Wins</small><b>${st.wins} (${rate}%)</b></div>
+        <div><small>Top 3 finishes</small><b>${st.podium}</b></div><div><small>Best net worth</small><b>${rs(st.best)}</b></div>
+      </div>
+      <div class="m-foot"><button class="btn red ghosty" data-m="resetstats">Reset stats</button><button class="btn gold" data-m="close">Close</button></div>`, true);
+  }
+  function settingsModal() {
+    const p = prefs();
+    const row = (label, key, opts) => `<div class="set-row"><span>${label}</span><div class="chips">${opts.map(([v, l]) => `<button class="chip${String(p[key]) === String(v) ? ' on' : ''}" data-m="pref:${key}:${v}">${l}</button>`).join('')}</div></div>`;
+    openModal('settings', `<h2>⚙️ Settings<button class="x" data-m="close">✕</button></h2>
+      <div class="set-row"><span>Sound effects</span><div class="chips"><button class="chip${BR.sound.on ? ' on' : ''}" data-m="snd:on">On</button><button class="chip${BR.sound.on ? '' : ' on'}" data-m="snd:off">Off</button></div></div>
+      ${row('Vibration', 'vib', [[true, 'On'], [false, 'Off']])}
+      ${row('Bot speed', 'speed', [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']])}
+      <p class="hint">Bot speed is how long computer players think before each move.</p>
+      <div class="m-foot"><button class="btn gold" data-m="close">Done</button></div>`, true);
   }
 
   function continueSaved() {
@@ -230,7 +279,7 @@
   let raf = null, last = 0, acc = 0;
   function begin(ctrl) {
     UI.ctrl = ctrl;
-    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0;
+    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0;
     closeModal(true);
     show('game');
     BR.sfx('bell');
@@ -275,7 +324,7 @@
       if (myTurn(v)) {
         const wait = document.querySelector('.banner.round') ? 1300 : 0;
         later(() => { BR.sfx('turn'); banner('⭐ Your turn!', 'mine'); }, wait);
-        if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) { /* ignore */ }
+        if (navigator.vibrate && prefs().vib) try { navigator.vibrate(60); } catch (e) { /* ignore */ }
       }
     }
     // only rebuild the DOM when something visible changed
@@ -364,6 +413,9 @@
     margin: (t) => ({ ic: '⚠️', txt: `Bank sold ${kq(t.qty)} ${t.tk}`, c: 'down' }),
     found: (t) => ({ ic: '🏢', txt: `Founded ${t.note} (${t.tk})`, c: 'gold' }),
     raise: (t) => ({ ic: '🏢', txt: `Raised ${rs(t.qty * t.px)} in ${t.tk} IPO`, c: 'up' }),
+    tax: (t) => ({ ic: '🧾', txt: `Paid ${rs(t.px)} tax`, c: 'down' }),
+    bonus: (t) => ({ ic: '🎁', txt: `Lucky bonus ${rs(t.px)}`, c: 'up' }),
+    net: (t) => ({ ic: '🛟', txt: `Safety Net paid ${rs(t.qty * t.px)}`, c: 'up' }),
     pass: () => ({ ic: '✋', txt: 'Passed', c: 'flat' }),
   };
   const verb = (t) => (VERB[t.act] || VERB.pass)(t);
@@ -387,7 +439,7 @@
     const box = $('#actbox');
     if (v.phase !== 'turns') { box.innerHTML = '<div class="act-tip">Round over. Check the reveal!</div>'; return; }
     const passLine = `Turn ${v.pass + 1} of ${v.settings.turns}`;
-    const spyBtn = me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '';
+    const spyBtn = (me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '') + (me.tip ? '<button class="btn small" data-act="tip">🕵️ Tip</button>' : '');
     if (myTurn(v)) {
       box.innerHTML = `<div class="act-tip"><b>${passLine}</b> · tap a company to buy or sell, or play a ✨ card</div>
         <div class="act-btns">${spyBtn}${U.canFound(v, me) ? '<button class="btn gold" data-act="found">🏢 My company</button>' : ''}<button class="btn green" data-act="pass">✋ Pass</button></div>`;
@@ -397,6 +449,7 @@
       box.innerHTML = `<div class="act-tip"><b>${passLine}</b> · ${lastLine}</div><div class="act-btns">${spyBtn}</div>`;
     }
     if (UI.wantSpy && me.spy) { UI.wantSpy = false; spyModal(v, me); }
+    if (UI.wantTip && me.tip) { UI.wantTip = false; tipModal(v, me); }
   }
 
   function priceCard(v, k, mini) {
@@ -545,6 +598,7 @@
     const act = e.target.closest('[data-act]');
     if (act && act.dataset.act === 'pass') { BR.sfx('tap'); send({ type: 'pass' }); }
     if (act && act.dataset.act === 'spy') spyModal(v, me);
+    if (act && act.dataset.act === 'tip') tipModal(v, me);
     if (act && act.dataset.act === 'found') { BR.sfx('power'); foundModal(v, me); }
   });
 
@@ -565,6 +619,7 @@
   // ---------------------------------------------------------------- modals
   function openModal(kind, html, narrow) {
     UI.modal = kind;
+    $$('#fx .bubble').forEach((b) => b.remove());
     $('#modal-card').className = 'modal-card' + (narrow ? ' narrow' : '') + ' m-' + kind;
     $('#modal-card').innerHTML = html;
     $('#modal').classList.remove('hidden');
@@ -612,7 +667,7 @@
       if (send({ type: 'special', card, tk: tk || undefined })) {
         BR.sfx('power'); closeModal(true);
         if (sp) banner(`${BR.SPECIALS[sp].icon} ${BR.SPECIALS[sp].name}${tk ? ' on ' + tk : ''}!`, 'gold');
-        if (UI.ctrl.local) { const nv = view(); const nm = meP(nv); if (sp === 'SPY' && nm.spy) spyModal(nv, nm); } else if (sp === 'SPY') UI.wantSpy = true;
+        if (UI.ctrl.local) { const nv = view(); const nm = meP(nv); if (sp === 'SPY' && nm.spy) spyModal(nv, nm); if (sp === 'TIP' && nm.tip) tipModal(nv, nm); } else if (sp === 'SPY') UI.wantSpy = true; else if (sp === 'TIP') UI.wantTip = true;
       }
     } else if (k.startsWith('amt:')) { UI.bankAmt = +k.slice(4); bankModal(v, me, true); }
     else if (k === 'loan' || k === 'repay' || k === 'fdIn' || k === 'fdOut') {
@@ -623,6 +678,9 @@
     else if (k.startsWith('lf:')) { UI.logFilter = k.slice(3); logModal(v, me); }
     else if (k.startsWith('co:')) { const c = U.company(v, k.slice(3)); if (c.status === 'ipo') ipoModal(v, me); else tradeModal(v, me, c.tk); }
     else if (k === 'skip') finishReveal(v, me, true);
+    else if (k.startsWith('pref:')) { const [, key, val] = k.split(':'); const p = prefs(); p[key] = val === 'true' ? true : val === 'false' ? false : val; store.set('br.prefs', p); applyPrefs(); settingsModal(); }
+    else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); }
+    else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); statsModal(); renderHome(); }
     else if (k.startsWith('fi:')) { UI.foundName = ($('#found-name') || {}).value; UI.foundIssue = +k.slice(3); foundModal(v, me); }
     else if (k === 'found') {
       const name = ($('#found-name') || {}).value || '';
@@ -800,6 +858,16 @@
       <p class="hint">Only you can see this. Open it again this round from the 🔍 button.</p><div class="m-foot"><button class="btn gold" data-m="close">Got it</button></div>`);
   }
 
+  function tipModal(v, me) {
+    if (!me.tip) return;
+    const by = {};
+    for (const k of me.tip) (by[k.tk] = by[k.tk] || []).push(k.v);
+    const rows = Object.keys(by).map((tk) => { const c = U.company(v, tk); const n = by[tk].reduce((a, x) => a + x, 0);
+      return `<div class="prow">${c ? logo(c, 24) : ''}<span><b>${tk}</b><small>${by[tk].map((x) => `<b class="${cls(x)}">${sgn(x)}</b>`).join(' ')}</small></span><b class="${cls(n)}">${sgn(n)}</b></div>`; }).join('') || '<div class="hint">No hidden cards this round.</div>';
+    openModal('tip', `<h2>🕵️ Insider Tip<small>Hidden market cards</small><button class="x" data-m="close">✕</button></h2>${rows}
+      <p class="hint">These cards are not in anyone's hand, but they still move prices at the reveal. Only you can see this.</p><div class="m-foot"><button class="btn gold" data-m="close">Got it</button></div>`, true);
+  }
+
   function bankModal(v, me, refresh) {
     if (refresh && UI.modal !== 'bank') return;
     const limit = U.loanLimit(v, me);
@@ -915,6 +983,12 @@
     const title = TITLES.find(([t]) => t(mine))[1];
     const best = store.get('br.best2', 0);
     if (!UI.ctrl.online && mine.worth > best) store.set('br.best2', mine.worth);
+    if (!UI.statsSaved) {
+      UI.statsSaved = true;
+      const st = stats();
+      st.played++; if (rank === 1) st.wins++; if (rank <= 3) st.podium++; st.best = Math.max(st.best, mine.worth);
+      store.set('br.stats', st);
+    }
     if (rank === 1) { BR.sfx('fanfare'); confetti(); } else BR.sfx('win');
     const order = [f[1], f[0], f[2]].filter(Boolean);
     const pod = order.map((p) => `<div class="pod p${f.indexOf(p) + 1}"><div class="av">${esc(p.avatar || '🙂')}</div><b>${esc(p.name)}</b><small>${rs(p.worth)}</small><div class="pn">#${f.indexOf(p) + 1}</div></div>`).join('');
@@ -985,7 +1059,9 @@
     <h4>✨ Gold cards</h4><p>Everyone starts with 3 and keeps them until played. Players in the bottom half get a new one after each reveal, so nobody runs away with the game.</p>
     <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40 · 🔒 Trading Freeze: no move</li>
     <li>🚀 Rupee Rocket: all +10% · 📉 Rupee Slide: all −10% · 🚧 Upper Limit: max +₹15 · 🪂 Lower Limit: max −₹15</li>
-    <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li></ul>
+    <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li>
+    <li>🐂 Bull Charge: +₹25 · 🎲 Double Trouble: moves ×2 · 🛟 Safety Net: the bank covers your loss on one company</li>
+    <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
     <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
     <h4>🏢 Your own company</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company.</p>
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>

@@ -44,16 +44,20 @@
       <p class="tag">The stock market party game</p>
     </div>
     <div class="menu-btns">
-      <button class="mbtn play" data-go="setup"><span class="mi">🎲</span><span><b>Play vs Computer</b><small>1 to 5 bots</small></span></button>
+      <div class="profile-strip" id="profile-strip"></div>
+      <button class="mbtn play" data-go="setup"><span class="mi">🎲</span><span><b>Play vs Computer</b><small>Pick bots, rounds and skill</small></span></button>
+      <button class="mbtn quick" id="btn-quick"><span class="mi">⚡</span><span><b>Quick Game</b><small>3 bots · 6 rounds · start now</small></span></button>
       <button class="mbtn online" data-go="online"><span class="mi">🌐</span><span><b>Play Online</b><small>Rooms with friends</small></span></button>
       <button class="mbtn cont hidden" id="btn-continue"><span class="mi">⟲</span><span><b>Continue</b><small>Your saved game</small></span></button>
-      <div class="row">
-        <button class="btn" data-go="howto">📘 How to play</button>
-        <button class="btn" id="btn-sound">🔊 Sound on</button>
+      <div class="row three">
+        <button class="btn" data-go="howto">📘 Rules</button>
+        <button class="btn" id="btn-stats">🏆 Stats</button>
+        <button class="btn" id="btn-settings">⚙️ Settings</button>
       </div>
     </div>
   </div>
-  <div class="version">v4.1 · All companies, logos and events are fictional</div>
+  <div class="tip-line" id="tip-line"></div>
+  <div class="version">v5.0 · All companies, logos and events are fictional</div>
 </section>
 
 <!-- Offline setup -->

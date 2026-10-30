@@ -48,6 +48,12 @@
     LOWCAP: { name: 'Lower Limit', icon: '🪂', target: true, desc: 'Company can fall at most −₹15 this round.' },
     DIVIDEND: { name: 'Dividend Day', icon: '💰', target: true, desc: 'Every holder gets ₹5 per share at the reveal.' },
     SPY: { name: 'Spy Glass', icon: '🔍', target: false, desc: 'Secretly see one rival\'s whole hand.' },
+    CHARGE: { name: 'Bull Charge', icon: '🐂', target: true, desc: 'Company jumps +₹25 at the reveal.' },
+    DOUBLE: { name: 'Double Trouble', icon: '🎲', target: true, desc: 'Company moves twice as much this round, up or down.' },
+    NET: { name: 'Safety Net', icon: '🛟', target: true, own: true, desc: 'If this company falls this round, the bank pays you back the loss on your shares.' },
+    TIP: { name: 'Insider Tip', icon: '🕵️', target: false, desc: 'Peek at the hidden market cards for this round.' },
+    TAX: { name: 'Tax Raid', icon: '🧾', target: false, desc: 'The richest rival pays 5% of their net worth to the bank.' },
+    LUCKY: { name: 'Lucky Bonus', icon: '🎁', target: false, desc: 'Collect ₹1 lakh cash right now.' },
   };
 
   BR.RULES = {
