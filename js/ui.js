@@ -63,7 +63,7 @@
   // ---------------------------------------------------------------- screens
   let rainT = null;
   function show(id) {
-    $$('.screen').forEach((s) => { if (s.id !== 'scr-studio') s.classList.toggle('active', s.id === 'scr-' + id); });
+    $$('.screen').forEach((s) => { s.classList.toggle('active', s.id === 'scr-' + id); });
     UI.screen = id;
     if (id === 'title') { startRain(); renderHome(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
@@ -1072,8 +1072,8 @@
     <li>👑 <b>Owner</b>: at least 50,000 shares. The two worst minus cards are cancelled.</li></ul>
     <h4>💥 Bankrupt and 🎉 bonus</h4><ul><li>A company that falls to ₹0 goes bankrupt and its shares are wiped out. It comes back next round at its starting price.</li>
     <li>At ₹250 a company gives a 1:1 bonus: shares double, price halves.</li></ul>
-    <h4>✨ Gold cards</h4><p>Everyone starts with 3 and keeps them until played. Players in the bottom half get a new one after each reveal, so nobody runs away with the game.</p>
-    <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40, kept secret until the reveal · 🔒 Trading Freeze: no move</li>
+    <h4>✨ Gold cards</h4><p>Gold cards are secret: rivals only see that you played one, and find out which at the reveal. Everyone starts with 3 and keeps them until played. Players in the bottom half get a new one after each reveal, so nobody runs away with the game.</p>
+    <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40 · 🔒 Trading Freeze: no move</li>
     <li>🚀 Rupee Rocket: all +10% · 📉 Rupee Slide: all −10% · 🚧 Upper Limit: max +₹15 · 🪂 Lower Limit: max −₹15</li>
     <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li>
     <li>🐂 Bull Charge: +₹25 · 🎲 Double Trouble: moves ×2 · 🛟 Safety Net: the bank covers your loss on one company</li>
@@ -1084,16 +1084,9 @@
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>
     <h4>🌐 Online</h4><p>One player hosts a room and shares the 5-letter code. Up to 6 players; bots can fill empty seats.</p>`;
 
-  // studio intro on launch; a tap skips it
-  function studioIntro() {
-    const st = $('#scr-studio');
-    let done = false;
-    const end = () => { if (done) return; done = true; st.classList.add('out'); setTimeout(() => st.classList.remove('active'), 520); };
-    st.addEventListener('click', end);
-    setTimeout(end, 2300);
-  }
-
   setupScreens();
   show('title');
-  studioIntro();
+  const studio = $('#studio');
+  studio.addEventListener('click', () => studio.classList.add('skip'));
+  studio.addEventListener('animationend', (e) => { if (e.target === studio) studio.remove(); });
 })(window.BR = window.BR || {});

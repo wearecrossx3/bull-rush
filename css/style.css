@@ -476,13 +476,12 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 @media (max-height: 420px) and (orientation: landscape) { .profile-strip { padding: 3px 10px; } .ps-av { width: 30px; height: 30px; font-size: 18px; } .tip-line { display: none; } .mbtn small { display: none; } }
 .menu-list .row .btn { flex: 1; }
 
-/* studio intro */
-#scr-studio { z-index: 60; background: #0d1222; align-items: center; justify-content: center; transition: opacity .5s; }
-#scr-studio.out { opacity: 0; pointer-events: none; }
-.studio-box { text-align: center; color: #fff; }
-.studio-name { font-size: min(8vh, 36px); font-weight: 900; letter-spacing: 6px; animation: rise .7s ease-out .2s both; }
-.studio-name span { color: #ffb400; }
-.studio-line { height: 3px; width: 0; margin: 12px auto 0; background: #ffb400; border-radius: 2px; animation: line .6s ease-out .7s forwards; }
-.studio-sub { margin-top: 10px; font-size: 12px; font-weight: 800; letter-spacing: 6px; color: #8d99bd; text-transform: uppercase; animation: rise .6s ease-out 1s both; }
-@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
-@keyframes line { to { width: 70%; } }
+
+/* studio intro: small centred logo, fade in .7s, hold 1.2s, fade out .6s */
+.studio { position: fixed; inset: 0; z-index: 100; background: #120b1c; display: grid; place-items: center; animation: studio-out .6s ease-in 1.9s forwards; }
+.studio.skip { animation: studio-out .25s ease-in forwards; }
+.studio-logo { width: clamp(150px, 21vw, 300px); height: auto; opacity: 0; animation: studio-in .7s ease-out forwards; }
+.sl-main { fill: #fff; font-size: 40px; font-weight: 900; letter-spacing: 1px; }
+.sl-sub { fill: #b9a9cc; font-size: 15px; font-weight: 700; letter-spacing: 5px; }
+@keyframes studio-in { to { opacity: 1; } }
+@keyframes studio-out { to { opacity: 0; visibility: hidden; } }

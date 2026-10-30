@@ -12,7 +12,8 @@
     const est = {};
     for (const c of s.companies) if (c.status === 'active' || c.status === 'ipo') est[c.tk] = (U.rnd(s) - 0.5) * st.noise;
     for (const k of p.hand) if (est[k.tk] !== undefined) est[k.tk] += k.v;
-    const rup = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
+    const known = s.plays.filter((x) => !x.secret || x.pid === p.id);
+    const rup = known.filter((x) => x.sp === 'RUPUP').length - known.filter((x) => x.sp === 'RUPDN').length;
     for (const t in est) {
       const c = U.company(s, t);
       est[t] += rup * c.price * 0.1;
