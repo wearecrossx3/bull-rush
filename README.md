@@ -11,7 +11,9 @@ All companies, events, cards and artwork in this game are original and fictional
 - Big reveal at the end of each round: all cards flip one by one and each company moves by its total
 - Bankruptcy at ₹0 wipes shares; a 1:1 bonus at ₹250 doubles them
 - 3 gold cards each at the start, kept until played; players in the bottom half get a catch-up card after every reveal
-- Gold cards: Rights Offer, Scam Exposed, Trading Freeze, Rupee Rocket, Rupee Slide, Upper Limit, Lower Limit, Dividend Day, Spy Glass
+- 15 gold cards: Rights Offer, Scam Exposed, Trading Freeze, Rupee Rocket, Rupee Slide, Upper Limit, Lower Limit, Dividend Day, Spy Glass, Bull Charge, Double Trouble, Safety Net, Insider Tip, Tax Raid, Lucky Bonus
+- Average buy price and profit/loss for every holding
+- Reach ₹1 Cr net worth to list your own company through an IPO
 - Co-owner (top holder with 20,000+ shares) cancels the worst minus card; Owner (50,000+) cancels the two worst
 - Market brain: expensive stocks lean down, beaten-down stocks lean up, long streaks tire out
 - Bank: credit of ₹2 lakh plus half your shares, 5% interest per round, fixed deposits at 2%, margin calls
@@ -21,7 +23,12 @@ All companies, events, cards and artwork in this game are original and fictional
 - Money-stack animations, round banners, card flips, confetti and synthesised sound effects
 - 1 to 5 bots with three skill levels; auto-save every round
 - Online rooms for up to 6 players (PeerJS, host runs the game)
-- Cosy wooden-table cartoon look, works in portrait and landscape
+- Clean, minimal look that works on phones and iPads, portrait and landscape
+- Home screen with Quick Game, stats and settings (sound, vibration, bot speed)
+
+## Web app (iPhone / iPad)
+
+The `gh-pages` branch serves `www/` at https://wearecrossx3.github.io/bull-rush/. Open it in Safari and use Share → Add to Home Screen; it then runs full-screen and works offline (`sw.js`).
 
 ## Layout
 

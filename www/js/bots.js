@@ -23,9 +23,12 @@
         if (x.sp === 'UPCAP') est[t] = Math.min(est[t], 15);
         if (x.sp === 'LOWCAP') est[t] = Math.max(est[t], -15);
         if (x.sp === 'FREEZE') est[t] = 0;
+        if (x.sp === 'CHARGE') est[t] += 25;
+        if (x.sp === 'DOUBLE') est[t] *= 2;
       }
     }
     if (p.spy) for (const k of p.spy.cards) if (est[k.tk] !== undefined) est[k.tk] += k.v;
+    if (p.tip) for (const k of p.tip) if (est[k.tk] !== undefined) est[k.tk] += k.v;
     // owners know their worst minus cards will be blocked
     for (const t in est) { const o = U.ownerOf(s, U.company(s, t)); if (o && o.p.id === p.id) est[t] += 8 * o.blocks; }
     return est;
@@ -56,10 +59,18 @@
       if (k === 'RUPUP' && owned.length) return { type: 'special', card: sp.id };
       if (k === 'RUPDN' && !owned.length) return { type: 'special', card: sp.id };
       if (k === 'SPY' && s.pass === 0) return { type: 'special', card: sp.id };
+      if ((k === 'CHARGE' || k === 'DOUBLE') && owned[0] && est[owned[0]] > 0) return { type: 'special', card: sp.id, tk: owned[0] };
+      if (k === 'NET' && fall) return { type: 'special', card: sp.id, tk: fall };
+      if (k === 'TIP' && s.pass === 0) return { type: 'special', card: sp.id };
+      if (k === 'LUCKY') return { type: 'special', card: sp.id };
+      if (k === 'TAX' && s.players.some((o) => o.id !== p.id && U.netWorth(s, o) > U.netWorth(s, p))) return { type: 'special', card: sp.id };
     }
 
+    // 2b. rich bots list their own company
+    if (p.bot !== 'easy' && U.canFound(s, p)) return { type: 'found', name: `${p.name.split(' ')[0]} ${U.pick(s, ['Ventures', 'Industries', 'Labs', 'Capital', 'Motors'])}`, issue: 50 };
+
     // 3. IPO if our cards say it will pop
-    if (s.ipo && !p.ipoBlocks && (est[s.ipo.tk] > 3 || (p.bot === 'easy' && U.rnd(s) < 0.4))) {
+    if (s.ipo && s.ipo.founder !== p.id && !p.ipoBlocks && (est[s.ipo.tk] > 3 || (p.bot === 'easy' && U.rnd(s) < 0.4))) {
       const b = Math.min(R.ipoMaxBlocks, Math.floor(p.cash * 0.4 / (R.block * s.ipo.issue)));
       if (b > 0) return { type: 'ipo', blocks: b };
     }

@@ -11,6 +11,7 @@
     BANK: { name: 'Banking', color: '#ffd23f' },
     AIR: { name: 'Aviation', color: '#5fd3ff' },
     ENER: { name: 'Energy', color: '#ff5c8a' },
+    OWN: { name: 'Startup', color: '#f5b700' },
   };
 
   // Pool of fictional companies; each game picks 8 for the board and 3 more for IPOs,
@@ -47,6 +48,12 @@
     LOWCAP: { name: 'Lower Limit', icon: '🪂', target: true, desc: 'Company can fall at most −₹15 this round.' },
     DIVIDEND: { name: 'Dividend Day', icon: '💰', target: true, desc: 'Every holder gets ₹5 per share at the reveal.' },
     SPY: { name: 'Spy Glass', icon: '🔍', target: false, desc: 'Secretly see one rival\'s whole hand.' },
+    CHARGE: { name: 'Bull Charge', icon: '🐂', target: true, desc: 'Company jumps +₹25 at the reveal.' },
+    DOUBLE: { name: 'Double Trouble', icon: '🎲', target: true, desc: 'Company moves twice as much this round, up or down.' },
+    NET: { name: 'Safety Net', icon: '🛟', target: true, own: true, desc: 'If this company falls this round, the bank pays you back the loss on your shares.' },
+    TIP: { name: 'Insider Tip', icon: '🕵️', target: false, desc: 'Peek at the hidden market cards for this round.' },
+    TAX: { name: 'Tax Raid', icon: '🧾', target: false, desc: 'The richest rival pays 5% of their net worth to the bank.' },
+    LUCKY: { name: 'Lucky Bonus', icon: '🎁', target: false, desc: 'Collect ₹1 lakh cash right now.' },
   };
 
   BR.RULES = {
@@ -68,6 +75,10 @@
     fdRate: 0.02,         // per round
     marginAt: 0.7,        // loan above 70% of everything you own -> bank sells your shares
     ipoMaxBlocks: 5,
+    founderAt: 10000000,  // net worth needed to list your own company (₹1 Cr)
+    listingFee: 1000000,  // paid in cash to list it
+    founderShares: 30000, // promoter shares the founder keeps
+    founderIssue: [30, 50, 80],
     botThink: [1.8, 3.6], // seconds a bot "thinks" before acting
   };
 })(window.BR = window.BR || {});

@@ -36,6 +36,15 @@
     p.lastAct = { r: s.round, act, tk, qty, px, note: note || '' };
   }
 
+  // Average buy price: p.cost[tk] is what the current holding cost in total.
+  function addCost(p, tk, amt) { p.cost = p.cost || {}; p.cost[tk] = (p.cost[tk] || 0) + amt; }
+  function shrinkCost(p, tk, before) {
+    p.cost = p.cost || {};
+    const left = p.hold[tk] || 0;
+    if (!left) delete p.cost[tk]; else if (p.cost[tk]) p.cost[tk] = Math.round(p.cost[tk] * left / before);
+  }
+  function avgCost(p, tk) { return p.hold[tk] && p.cost && p.cost[tk] ? p.cost[tk] / p.hold[tk] : 0; }
+
   function priceOf(c) { return c.status === 'ipo' ? c.issue : c.price; }
   function holdingsValue(s, p) {
     let v = 0;
@@ -102,7 +111,7 @@
     }
     s.players = roster.map((r, i) => ({
       id: r.id, name: r.name, bot: r.bot || null, color: r.color || BR.COLORS[i % 6], avatar: r.avatar || BR.AVATARS[i],
-      cash: s.settings.startCash, hold: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
+      cash: s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
       ready: false, connected: true, worth: [s.settings.startCash], seat: i, lastAct: null, spy: null,
     }));
     for (const p of s.players) for (let i = 0; i < R.startGold; i++) p.gold.push(goldCard(s, p));
@@ -167,12 +176,18 @@
     }
 
     s.ipo = null;
-    if (s.ipoRounds.includes(s.round) && s.ipoDefs.length) {
-      const def = s.ipoDefs.shift();
+    let def = null;
+    if (s.foundQueue && s.foundQueue.length) {
+      // a player's own company jumps the queue; a scheduled IPO waits a round
+      def = s.foundQueue.shift();
+      s.ipoRounds = s.ipoRounds.map((r) => (r === s.round ? r + 1 : r));
+    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length) def = s.ipoDefs.shift();
+    if (def) {
       const c = newCompany(s, def, s.companies.length);
       c.status = 'ipo'; c.issue = def.start; c.history = [];
+      if (def.founder) c.founder = def.founder;
       s.companies.push(c);
-      s.ipo = { tk: c.tk, name: c.name, issue: def.start, blocks: Math.max(6, s.players.length * 4), pitch: def.pitch };
+      s.ipo = { tk: c.tk, name: c.name, issue: def.start, blocks: Math.max(6, s.players.length * 4), pitch: def.pitch, founder: def.founder || null };
       log(s, `🚀 IPO! ${c.name} opens at ₹${def.start}/share. Apply on your turn this round.`, 'ipo');
     }
 
@@ -185,6 +200,7 @@
       p.hand = hands[i];
       p.ipoBlocks = 0;
       p.spy = null;
+      p.tip = null;
       p.ready = !!p.bot;
     });
     s.market = rest;
@@ -225,9 +241,17 @@
         const shares = got * R.block;
         p.cash += p.ipoBlocked - shares * c.issue;
         p.ipoBlocked = 0;
-        if (shares) p.hold[c.tk] = (p.hold[c.tk] || 0) + shares;
+        if (shares) { p.hold[c.tk] = (p.hold[c.tk] || 0) + shares; addCost(p, c.tk, shares * c.issue); }
         events.push(`${p.avatar} ${p.name} got ${got} of ${p.ipoBlocks} IPO blocks in ${c.tk}.`);
         trade(s, p, 'ipo', c.tk, shares, c.issue, `allotted ${got}/${p.ipoBlocks}`);
+      }
+      const founder = c.founder && player(s, c.founder);
+      if (founder) {
+        const sold = s.players.reduce((a, p) => a + (p.id === founder.id ? 0 : p.hold[c.tk] || 0), 0);
+        founder.hold[c.tk] = (founder.hold[c.tk] || 0) + R.founderShares;
+        addCost(founder, c.tk, R.listingFee);
+        if (sold) { founder.cash += sold * c.issue; trade(s, founder, 'raise', c.tk, sold, c.issue, 'IPO money'); }
+        events.push(`🏢 ${founder.avatar} ${founder.name} listed ${c.name}, kept ${fmt(R.founderShares)} founder shares and raised ₹${fmt(sold * c.issue)}.`);
       }
       if (want > s.ipo.blocks) events.push(`${c.name} IPO was oversubscribed ${(want / s.ipo.blocks).toFixed(1)}x!`);
       c.status = 'active'; c.price = c.issue; c.history = [c.issue];
@@ -248,7 +272,9 @@
       }
       let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v), 0);
       const on = (sp) => s.plays.some((x) => x.sp === sp && x.tk === c.tk);
+      if (on('DOUBLE') && total) { total *= 2; mods.push('🎲 ×2'); }
       if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
+      if (on('CHARGE')) { total += 25; mods.push('🐂 +25'); }
       if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
       if (on('UPCAP') && total > 15) { total = 15; mods.push('🚧 max +15'); }
       if (on('LOWCAP') && total < -15) { total = -15; mods.push('🪂 max −15'); }
@@ -261,9 +287,20 @@
         for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * R.dividend; trade(s, p, 'div', c.tk, p.hold[c.tk], R.dividend); }
         row.note = `💰 Dividend ₹${R.dividend}/share paid`;
       }
+      if (to < from) {
+        for (const x of s.plays.filter((y) => y.sp === 'NET' && y.tk === c.tk)) {
+          const p = player(s, x.pid);
+          const q = p && p.hold[c.tk];
+          if (!q) continue;
+          const back = q * (from - to);
+          p.cash += back;
+          trade(s, p, 'net', c.tk, q, from - to, 'Safety Net');
+          events.push(`🛟 ${p.avatar} ${p.name}'s Safety Net paid ₹${fmt(back)} on ${c.tk}.`);
+        }
+      }
       if (to <= 0) {
         c.status = 'bankrupt';
-        for (const p of s.players) delete p.hold[c.tk];
+        for (const p of s.players) { delete p.hold[c.tk]; if (p.cost) delete p.cost[c.tk]; }
         row.note = '💥 BANKRUPT! All shares wiped out';
         log(s, `${c.name} went bankrupt. Every share is gone!`, 'down');
         to = 0;
@@ -327,8 +364,10 @@
     for (const c of held) {
       if (p.loan <= 0) break;
       const q = Math.min(p.hold[c.tk], Math.ceil(p.loan / c.price / R.block) * R.block);
+      const had = p.hold[c.tk];
       p.hold[c.tk] -= q;
       if (!p.hold[c.tk]) delete p.hold[c.tk];
+      shrinkCost(p, c.tk, had);
       const got = q * c.price;
       const pay = Math.min(got, p.loan);
       p.loan -= pay; p.cash += got - pay;
@@ -349,6 +388,7 @@
       if (q > available(s, c)) return `Only ${fmt(available(s, c))} ${c.tk} shares left`;
       p.cash -= q * c.price;
       p.hold[c.tk] = (p.hold[c.tk] || 0) + q;
+      addCost(p, c.tk, q * c.price);
       trade(s, p, 'buy', c.tk, q, c.price);
       log(s, `${p.avatar} ${p.name} bought ${fmt(q)} ${c.tk} @ ₹${c.price}`, 'up');
       return 'turn';
@@ -359,15 +399,18 @@
       if (!c || !live(c)) return 'That company is not trading';
       const q = b * R.block;
       if (!(b > 0) || q > (p.hold[c.tk] || 0)) return 'You do not have that many shares';
+      const had = p.hold[c.tk];
       p.cash += q * c.price;
       p.hold[c.tk] -= q;
       if (!p.hold[c.tk]) delete p.hold[c.tk];
+      shrinkCost(p, c.tk, had);
       trade(s, p, 'sell', c.tk, q, c.price);
       log(s, `${p.avatar} ${p.name} sold ${fmt(q)} ${c.tk} @ ₹${c.price}`, 'down');
       return 'turn';
     },
     ipo(s, p, a) {
       if (!s.ipo) return 'No IPO this round';
+      if (s.ipo.founder === p.id) return 'You cannot apply to your own IPO';
       const b = clamp(Math.floor(a.blocks), 1, R.ipoMaxBlocks);
       const cost = b * R.block * s.ipo.issue;
       p.cash += p.ipoBlocked;
@@ -390,19 +433,46 @@
         let add = Math.min(R.rightsMax, Math.floor(p.hold[c.tk] / 2 / R.block) * R.block || R.block);
         add = Math.min(add, Math.floor(p.cash / half / R.block) * R.block, Math.floor(available(s, c) / R.block) * R.block);
         if (!add) return 'Not enough cash for the rights shares';
-        p.cash -= add * half; p.hold[c.tk] += add;
+        p.cash -= add * half; p.hold[c.tk] += add; addCost(p, c.tk, add * half);
         trade(s, p, 'rights', c.tk, add, half, 'Rights Offer');
       } else if (k.sp === 'SPY') {
         const rivals = s.players.filter((o) => o.id !== p.id);
         const o = rivals[Math.floor(rnd(s) * rivals.length)];
         p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
         trade(s, p, 'gold', null, 0, 0, `🔍 spied on ${o.name}`);
+      } else if (k.sp === 'TIP') {
+        p.tip = s.market.map((x) => Object.assign({}, x));
+        trade(s, p, 'gold', null, 0, 0, '🕵️ took an Insider Tip');
+      } else if (k.sp === 'TAX') {
+        const rich = s.players.filter((o) => o.id !== p.id).sort((a, b) => netWorth(s, b) - netWorth(s, a))[0];
+        const amt = Math.max(0, Math.min(rich.cash, Math.round(netWorth(s, rich) * 0.05 / 1000) * 1000));
+        rich.cash -= amt;
+        trade(s, p, 'gold', null, 0, 0, `🧾 Tax Raid on ${rich.name}`);
+        trade(s, rich, 'tax', null, 0, amt, `raided by ${p.name}`);
+      } else if (k.sp === 'LUCKY') {
+        p.cash += 100000;
+        trade(s, p, 'bonus', null, 0, 100000, 'Lucky Bonus');
       } else {
-        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name });
+        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id });
         trade(s, p, 'gold', c ? c.tk : null, 0, 0, `${def.icon} ${def.name}`);
       }
       log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
       p.gold.splice(i, 1);
+      return 'turn';
+    },
+    found(s, p, a) {
+      if (p.founded) return 'You already have your own company';
+      if (netWorth(s, p) < R.founderAt) return `Reach ₹${fmt(R.founderAt)} net worth first`;
+      if (p.cash < R.listingFee) return `Listing costs ₹${fmt(R.listingFee)} in cash`;
+      if (s.round >= s.settings.rounds) return 'No rounds left to list a company';
+      const name = String(a.name || '').replace(/[^A-Za-z0-9 &.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || `${p.name.split(' ')[0]} Ventures`;
+      const issue = R.founderIssue.includes(+a.issue) ? +a.issue : R.founderIssue[1];
+      const tk = ticker(s, name);
+      p.cash -= R.listingFee;
+      p.founded = tk;
+      (s.foundQueue = s.foundQueue || []).push({ tk, name, sector: 'OWN', pitch: `Founded by ${p.name}`, start: issue, founder: p.id });
+      trade(s, p, 'found', tk, 0, R.listingFee, name);
+      log(s, `🏢 ${p.avatar} ${p.name} founded ${name}! Its IPO opens next round at ₹${issue}.`, 'ipo');
       return 'turn';
     },
     pass(s, p) { p.lastAct = { r: s.round, act: 'pass' }; log(s, `${p.avatar} ${p.name} passed.`, 'sys'); return 'turn'; },
@@ -436,7 +506,14 @@
     },
     ready(s, p) { p.ready = true; return null; },
   };
-  const TURN_ACTIONS = ['buy', 'sell', 'ipo', 'special', 'pass'];
+  const TURN_ACTIONS = ['buy', 'sell', 'ipo', 'special', 'found', 'pass'];
+  function ticker(s, name) {
+    const taken = new Set(s.companies.map((c) => c.tk).concat(s.ipoDefs.map((d) => d.tk), (s.foundQueue || []).map((d) => d.tk)));
+    let base = (name.toUpperCase().replace(/[^A-Z]/g, '') + 'XXXX').slice(0, 4);
+    for (let i = 2; taken.has(base); i++) base = base.slice(0, 3) + i;
+    return base;
+  }
+  function canFound(s, p) { return !p.founded && s.phase === 'turns' && s.round < s.settings.rounds && netWorth(s, p) >= R.founderAt && p.cash >= R.listingFee; }
 
   BR.act = function (s, pid, a) {
     const p = player(s, pid);
@@ -482,10 +559,10 @@
     for (const p of v.players) {
       p.handCount = p.hand.length;
       p.goldCount = p.gold.length;
-      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; }
+      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; p.tip = null; }
     }
     return v;
   };
 
-  BR.util = { available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
+  BR.util = { canFound, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
 })(window.BR = window.BR || {});
