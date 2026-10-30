@@ -481,7 +481,5 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .studio { position: fixed; inset: 0; z-index: 100; background: #120b1c; display: grid; place-items: center; animation: studio-out .6s ease-in 1.9s forwards; }
 .studio.skip { animation: studio-out .25s ease-in forwards; }
 .studio-logo { width: clamp(150px, 21vw, 300px); height: auto; opacity: 0; animation: studio-in .7s ease-out forwards; }
-.sl-main { fill: #fff; font-size: 40px; font-weight: 900; letter-spacing: 1px; }
-.sl-sub { fill: #b9a9cc; font-size: 15px; font-weight: 700; letter-spacing: 5px; }
 @keyframes studio-in { to { opacity: 1; } }
 @keyframes studio-out { to { opacity: 0; visibility: hidden; } }
