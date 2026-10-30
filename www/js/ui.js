@@ -312,7 +312,7 @@
   let raf = null, last = 0, acc = 0;
   function begin(ctrl) {
     UI.ctrl = ctrl;
-    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0;
+    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = '';
     closeModal(true);
     show('game');
     BR.sfx('bell');
@@ -498,7 +498,9 @@
       return `<div class="card sp" data-gold="${k.id}"><div class="ic">${d.icon}</div><div class="nm">${d.name}</div></div>`;
     }).join('');
     const cards = me.hand.map((k) => priceCard(v, k)).join('');
-    el.innerHTML = (gold ? `<div class="hand-grp gold">${gold}</div>` : '') + (cards ? `<div class="hand-grp">${cards}</div>` : '<div class="hand-empty">No price cards</div>');
+    const html = (gold ? `<div class="hand-grp gold">${gold}</div>` : '') + (cards ? `<div class="hand-grp">${cards}</div>` : '<div class="hand-empty">No price cards</div>');
+    // rebuilding identical cards restarts their shine and deal animations, which looks like lag
+    if (html !== UI.handHtml) { UI.handHtml = html; el.innerHTML = html; }
   }
 
   // ---------------------------------------------------------------- effects
