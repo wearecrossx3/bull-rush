@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4a2c12">
+<title>Bull Rush</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bull Rush">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Title -->
+<section id="scr-title" class="screen active">
+  <div class="coin-rain" id="coin-rain"></div>
+  <div class="title-wrap">
+    <div class="logo">
+      <svg viewBox="0 0 200 170" class="mascot" aria-hidden="true">
+        <defs>
+          <radialGradient id="mg" cx=".45" cy=".35" r=".7"><stop offset="0" stop-color="#ffe58a"/><stop offset="1" stop-color="#f5a800"/></radialGradient>
+          <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e4"/><stop offset="1" stop-color="#e2c697"/></linearGradient>
+        </defs>
+        <ellipse cx="100" cy="160" rx="62" ry="8" fill="#7a4f24" opacity=".25"/>
+        <circle cx="100" cy="92" r="64" fill="url(#mg)" stroke="#a86c00" stroke-width="5"/>
+        <circle cx="100" cy="92" r="52" fill="none" stroke="#fff3c2" stroke-width="3" stroke-dasharray="6 7" opacity=".8"/>
+        <path d="M46 52 C 22 46, 14 22, 30 8 C 32 26, 46 36, 62 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M154 52 C 178 46, 186 22, 170 8 C 168 26, 154 36, 138 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
+        <ellipse cx="100" cy="98" rx="40" ry="38" fill="#8a5a2b" stroke="#4a2c12" stroke-width="4"/>
+        <ellipse cx="100" cy="118" rx="26" ry="17" fill="#f3b9a0" stroke="#4a2c12" stroke-width="4"/>
+        <circle cx="91" cy="118" r="4" fill="#4a2c12"/><circle cx="109" cy="118" r="4" fill="#4a2c12"/>
+        <circle cx="84" cy="88" r="7" fill="#fff"/><circle cx="116" cy="88" r="7" fill="#fff"/>
+        <circle cx="86" cy="89" r="3.6" fill="#1b1400"/><circle cx="118" cy="89" r="3.6" fill="#1b1400"/>
+        <path d="M74 76 L92 81 M126 76 L108 81" stroke="#4a2c12" stroke-width="4" stroke-linecap="round"/>
+        <path d="M60 150 L88 124 L104 134 L140 100" fill="none" stroke="#12a46e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M128 96 L150 92 L146 114 Z" fill="#12a46e"/>
+      </svg>
+      <h1>BULL <span>RUSH</span></h1>
+      <p class="tag">The stock market party game</p>
+    </div>
+    <div class="menu-btns">
+      <button class="mbtn play" data-go="setup"><span class="mi">🎲</span><span><b>Play vs Computer</b><small>1 to 5 bots</small></span></button>
+      <button class="mbtn online" data-go="online"><span class="mi">🌐</span><span><b>Play Online</b><small>Rooms with friends</small></span></button>
+      <button class="mbtn cont hidden" id="btn-continue"><span class="mi">⟲</span><span><b>Continue</b><small>Your saved game</small></span></button>
+      <div class="row">
+        <button class="btn" data-go="howto">📘 How to play</button>
+        <button class="btn" id="btn-sound">🔊 Sound on</button>
+      </div>
+    </div>
+  </div>
+  <div class="version">v4.1 · All companies, logos and events are fictional</div>
+</section>
+
+<!-- Offline setup -->
+<section id="scr-setup" class="screen">
+  <div class="panel setup">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>New game</h2></header>
+    <div class="setup-grid">
+      <label>Your name<input id="in-name" maxlength="14" placeholder="Trader"></label>
+      <div class="field"><span>Avatar</span><div class="chips" id="pick-avatar"></div></div>
+      <div class="field"><span>Rival bots</span><div class="chips" id="pick-bots" data-opts="1,2,3,4,5" data-val="3"></div></div>
+      <div class="field"><span>Bot skill</span><div class="chips" id="pick-skill" data-opts="easy,normal,hard" data-val="normal"></div></div>
+      <div class="field"><span>Rounds</span><div class="chips" id="pick-days" data-opts="6,8,10" data-val="8"></div></div>
+      <div class="field"><span>Turns per round</span><div class="chips" id="pick-len" data-opts="2,3,4" data-val="3"></div></div>
+    </div>
+    <button class="btn gold big" id="btn-start">🔔 Ring the opening bell</button>
+  </div>
+</section>
+
+<!-- Online lobby -->
+<section id="scr-online" class="screen">
+  <div class="panel setup">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>Play online</h2></header>
+    <div id="online-home">
+      <label>Your name<input id="in-name-on" maxlength="14" placeholder="Trader"></label>
+      <div class="online-cols">
+        <div class="ocard">
+          <h3>Host a room</h3>
+          <p>Create a room and share the 5-letter code with friends.</p>
+          <button class="btn gold" id="btn-host">Create room</button>
+        </div>
+        <div class="ocard">
+          <h3>Join a room</h3>
+          <input id="in-code" maxlength="5" placeholder="CODE" class="code-in">
+          <button class="btn" id="btn-join">Join</button>
+        </div>
+      </div>
+      <p class="hint">Online play connects phones directly. All players need internet. Works best on Wi-Fi.</p>
+    </div>
+    <div id="online-lobby" class="hidden">
+      <div class="room-code">Room code <b id="room-code">-----</b></div>
+      <ul id="lobby-list" class="lobby-list"></ul>
+      <div id="host-ctrl" class="hidden">
+        <div class="field"><span>Rounds</span><div class="chips" id="pick-days-on" data-opts="6,8,10" data-val="8"></div></div>
+        <div class="field"><span>Turn timer</span><div class="chips" id="pick-len-on" data-opts="20,30,45" data-labels="20s,30s,45s" data-val="30"></div></div>
+        <div class="row"><button class="btn ghost" id="btn-addbot">+ Add bot</button><button class="btn gold" id="btn-host-start">Start game</button></div>
+      </div>
+      <p class="hint" id="lobby-msg">Waiting for players...</p>
+    </div>
+  </div>
+</section>
+
+<!-- How to play -->
+<section id="scr-howto" class="screen">
+  <div class="panel howto">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>How to play</h2></header>
+    <div class="howto-body" id="howto-body"></div>
+  </div>
+</section>
+
+<!-- Game -->
+<section id="scr-game" class="screen">
+  <div class="topbar">
+    <div class="tb-logo">BULL<span>RUSH</span></div>
+    <div class="tb-day"><small>ROUND</small><b id="tb-day">1/8</b></div>
+    <div class="tb-turn" id="tb-turn">Your turn!</div>
+    <div class="tb-money"><small>CASH</small><b id="tb-cash">₹0</b></div>
+    <div class="tb-money"><small>NET WORTH</small><b id="tb-worth">₹0</b><i id="tb-worth-chg"></i></div>
+    <button class="btn small" id="btn-dash">📊 <span class="lbl">Shares</span></button>
+    <button class="btn small" id="btn-log">📜 <span class="lbl">Trades</span></button>
+    <button class="btn small" id="btn-bank">🏦 <span class="lbl">Bank</span></button>
+    <button class="icon-btn" id="btn-menu">☰</button>
+  </div>
+  <div class="table">
+    <div class="board" id="board"></div>
+    <div class="seats-col">
+      <div class="seats" id="seats"></div>
+      <div class="actbox" id="actbox"></div>
+    </div>
+  </div>
+  <div class="hand" id="hand"></div>
+</section>
+
+<div id="modal" class="modal hidden"><div class="modal-card" id="modal-card"></div></div>
+<div id="toast" class="toast"></div>
+<div id="fx" class="fx"></div>
+
+<script src="vendor/peerjs.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/net.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+<script>if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(function () {});</script>
+</body>
+</html>
