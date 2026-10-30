@@ -456,34 +456,30 @@
         add = Math.min(add, Math.floor(p.cash / half / R.block) * R.block, Math.floor(available(s, c) / R.block) * R.block);
         if (!add) return 'Not enough cash for the rights shares';
         p.cash -= add * half; p.hold[c.tk] += add; addCost(p, c.tk, add * half);
-        trade(s, p, 'rights', c.tk, add, half, 'Rights Offer');
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else if (k.sp === 'SPY') {
         const rivals = s.players.filter((o) => o.id !== p.id);
         const o = rivals[Math.floor(rnd(s) * rivals.length)];
         p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
-        trade(s, p, 'gold', null, 0, 0, `🔍 spied on ${o.name}`);
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else if (k.sp === 'TIP') {
         p.tip = s.market.map((x) => Object.assign({}, x));
-        trade(s, p, 'gold', null, 0, 0, '🕵️ took an Insider Tip');
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else if (k.sp === 'TAX') {
         const rich = s.players.filter((o) => o.id !== p.id).sort((a, b) => netWorth(s, b) - netWorth(s, a))[0];
         const amt = Math.max(0, Math.min(rich.cash, Math.round(netWorth(s, rich) * 0.05 / 1000) * 1000));
         rich.cash -= amt;
-        trade(s, p, 'gold', null, 0, 0, `🧾 Tax Raid on ${rich.name}`);
-        trade(s, rich, 'tax', null, 0, amt, `raided by ${p.name}`);
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
+        trade(s, rich, 'tax', null, 0, amt, 'hit by a secret card');
       } else if (k.sp === 'LUCKY') {
         p.cash += 100000;
-        trade(s, p, 'bonus', null, 0, 100000, 'Lucky Bonus');
-      } else if (def.secret) {
-        // stays hidden from rivals until the reveal, so nobody can dump the shares in time
-        s.plays.push({ sp: k.sp, tk: c.tk, who: p.name, pid: p.id, secret: true });
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else {
-        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id });
-        trade(s, p, 'gold', c ? c.tk : null, 0, 0, `${def.icon} ${def.name}`);
+        // every gold card stays hidden from rivals until the reveal, so nobody can react to it in time
+        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true });
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       }
-      if (def.secret) log(s, `🤫 ${p.name} played a secret card. Find out at the reveal!`, 'corp');
-      else log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
+      log(s, `🤫 ${p.name} played a secret card. Find out at the reveal!`, 'corp');
       p.gold.splice(i, 1);
       return 'turn';
     },
