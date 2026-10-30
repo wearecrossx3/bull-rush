@@ -102,8 +102,14 @@
     };
     const pool = shuffle(s, BR.COMPANY_POOL.slice());
     s.palette = shuffle(s, PALETTE.slice());
-    s.companies = BR.START_PRICES.map((start, i) => newCompany(s, Object.assign({ start }, pool[i]), i));
-    s.ipoDefs = pool.slice(8).map((d, i) => Object.assign({ start: BR.IPO_PRICES[i % BR.IPO_PRICES.length] }, d));
+    // how many companies start on the board: 6-12, or 0 for a random number
+    let nCo = Math.floor(s.settings.companies) || 0;
+    nCo = nCo ? clamp(nCo, 4, 12) : 6 + Math.floor(rnd(s) * 7);
+    s.settings.companies = nCo;
+    const starts = nCo === 8 ? BR.START_PRICES : Array.from({ length: nCo }, (_, i) => Math.round((20 + (90 * i) / Math.max(1, nCo - 1)) / 5) * 5);
+    s.companies = starts.map((start, i) => newCompany(s, Object.assign({ start }, pool[i]), i));
+    s.ipoCap = Math.min(14, nCo + 4);
+    s.ipoDefs = pool.slice(nCo).map((d, i) => Object.assign({ start: BR.IPO_PRICES[i % BR.IPO_PRICES.length] }, d));
     s.ipoRounds = [];
     const n = s.settings.rounds;
     if (n && n <= 10) {
@@ -192,7 +198,7 @@
       // a player's own company jumps the queue; a scheduled IPO waits a round
       def = s.foundQueue.shift();
       s.ipoRounds = s.ipoRounds.map((r) => (r === s.round ? r + 1 : r));
-    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length && s.companies.filter((c) => !c.founder).length < 12) def = s.ipoDefs.shift();
+    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length && s.companies.filter((c) => !c.founder).length < (s.ipoCap || 12)) def = s.ipoDefs.shift();
     if (!s.settings.rounds && !s.ipoRounds.some((r) => r > s.round)) scheduleIpos(s);
     if (def) {
       const c = newCompany(s, def, s.companies.length);

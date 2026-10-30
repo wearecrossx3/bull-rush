@@ -117,7 +117,7 @@
       BR.sfx('tap');
       av.dataset.val = b.dataset.v; av.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
     });
-    ['#pick-bots', '#pick-skill', '#pick-days', '#pick-len', '#pick-days-on', '#pick-len-on'].forEach((q) => chips($(q)));
+    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on'].forEach((q) => chips($(q)));
     $('#btn-start').onclick = startOffline;
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
@@ -155,13 +155,13 @@
     const names = BR.BOT_NAMES.slice().sort(() => Math.random() - 0.5);
     const avs = BR.AVATARS.filter((a) => a !== me.avatar).sort(() => Math.random() - 0.5);
     for (let i = 0; i < nBots; i++) roster.push({ id: 'bot' + i, name: names[i], bot: skill, avatar: avs[i], color: BR.COLORS[(i + 1) % 6] });
-    const s = BR.createGame({ rounds: +$('#pick-days').dataset.val, turns: +$('#pick-len').dataset.val }, roster);
+    const s = BR.createGame({ rounds: +$('#pick-days').dataset.val, turns: +$('#pick-len').dataset.val, companies: +$('#pick-cos').dataset.val }, roster);
     begin(LocalCtrl(s, 'me'));
   }
 
   function quickGame() {
     BR.sfx('tap');
-    $('#pick-bots').dataset.val = '3'; $('#pick-days').dataset.val = '6'; $('#pick-len').dataset.val = '3'; $('#pick-skill').dataset.val = 'normal';
+    $('#pick-bots').dataset.val = '3'; $('#pick-days').dataset.val = '6'; $('#pick-len').dataset.val = '3'; $('#pick-skill').dataset.val = 'normal'; $('#pick-cos').dataset.val = '8';
     startOffline();
   }
 
@@ -228,7 +228,7 @@
     $('#btn-addbot').onclick = () => host.addBot();
     $('#btn-host-start').onclick = () => {
       if (host.roster.length < 2) { toast('Add a bot or wait for a friend', 'err'); return; }
-      host.start({ rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val });
+      host.start({ rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val, companies: +$('#pick-cos-on').dataset.val });
       begin({
         local: true, online: true, me: 'host',
         view() { return host.game; },
