@@ -188,8 +188,10 @@ input:focus { border-color: var(--gold); }
 .card .val.up { color: #0b9a68; } .card .val.down { color: var(--red); }
 .card .arrow { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 900; color: #7c87a3; }
 .card.sp { background: linear-gradient(160deg, #fff1a8, #f5b700 70%, #e09a00); border-color: #ffffff; }
-.card.sp::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .7) 45%, transparent 60%); background-size: 250% 100%; animation: sheen 2.8s infinite; pointer-events: none; }
-@keyframes sheen { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+/* gold sheen: one light strip moved with transform only, so the phone's GPU does it without repainting the card */
+.card.sp::after { content: ""; position: absolute; top: -10%; bottom: -10%; left: 0; width: 45%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .65), transparent); transform: translate3d(-120%, 0, 0) skewX(-15deg); animation: sheen 4s ease-in-out infinite; will-change: transform; pointer-events: none; }
+.card.sp:nth-child(2n)::after { animation-delay: 1.3s; } .card.sp:nth-child(3n)::after { animation-delay: 2.6s; }
+@keyframes sheen { 0%, 60% { transform: translate3d(-120%, 0, 0) skewX(-15deg); } 100% { transform: translate3d(320%, 0, 0) skewX(-15deg); } }
 .card.sp .ic { font-size: 28px; text-align: center; margin-top: 10px; }
 .card.sp .nm { font-size: 9px; font-weight: 900; text-align: center; padding: 2px; line-height: 1.1; color: #5a3600; }
 .card.mini { transform: none !important; margin: 0; }
@@ -502,8 +504,8 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 
 /* mascot */
 .mascot-wrap { position: relative; display: inline-block; }
-.mascot-wrap .glow { position: absolute; left: 50%; top: 52%; width: 150%; height: 150%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(255, 194, 26, .45), transparent 62%); animation: glow 2.6s ease-in-out infinite; pointer-events: none; }
-@keyframes glow { 50% { opacity: .55; transform: translate(-50%, -50%) scale(1.08); } }
+.mascot-wrap .glow { position: absolute; left: 50%; top: 52%; width: 150%; height: 150%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(255, 194, 26, .45), transparent 62%); animation: halo 2.6s ease-in-out infinite; pointer-events: none; }
+@keyframes halo { 50% { opacity: .55; transform: translate(-50%, -50%) scale(1.08); } }
 .lobby .mascot { position: relative; filter: drop-shadow(0 10px 0 rgba(0, 0, 0, .25)); }
 .eyes { animation: blink 4.5s infinite; transform-origin: 100px 88px; }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
