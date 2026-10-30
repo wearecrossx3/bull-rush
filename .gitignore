@@ -1,0 +1,4 @@
+android/out/
+android/*.p12
+__pycache__/
+node_modules/

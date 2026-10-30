@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Bull Rush</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="rotate"><div class="rot-icon">📱↻</div><p>Turn your phone sideways to play</p></div>
+
+<!-- Title -->
+<section id="scr-title" class="screen active">
+  <canvas id="title-bg"></canvas>
+  <div class="title-wrap">
+    <div class="logo">
+      <svg viewBox="0 0 120 80" class="logo-mark" aria-hidden="true">
+        <defs><linearGradient id="lg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00c389"/><stop offset="1" stop-color="#ffd23f"/></linearGradient></defs>
+        <path d="M10 62 L40 36 L60 48 L100 12" fill="none" stroke="url(#lg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M84 10 L108 6 L104 30 Z" fill="#ffd23f"/>
+        <path d="M18 30 C 10 22, 12 12, 22 8 M 44 30 C 52 22, 50 12, 40 8" fill="none" stroke="#ffd23f" stroke-width="5" stroke-linecap="round" opacity=".9"/>
+      </svg>
+      <h1>BULL <span>RUSH</span></h1>
+      <p class="tag">Trade smart. Ride the bull. Own the market.</p>
+    </div>
+    <div class="menu-btns">
+      <button class="btn gold big" data-go="setup">▶ Play vs Computer</button>
+      <button class="btn big" data-go="online">🌐 Play Online</button>
+      <button class="btn big ghost hidden" id="btn-continue">⟲ Continue saved game</button>
+      <div class="row">
+        <button class="btn ghost" data-go="howto">📘 How to play</button>
+        <button class="btn ghost" id="btn-sound">🔊 Sound on</button>
+      </div>
+    </div>
+  </div>
+  <div class="version">v1.0 · All companies and events are fictional</div>
+</section>
+
+<!-- Offline setup -->
+<section id="scr-setup" class="screen">
+  <div class="panel setup">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>New game</h2></header>
+    <div class="setup-grid">
+      <label>Your name<input id="in-name" maxlength="14" placeholder="Trader"></label>
+      <div class="field"><span>Avatar</span><div class="chips" id="pick-avatar"></div></div>
+      <div class="field"><span>Rival bots</span><div class="chips" id="pick-bots" data-opts="1,2,3,4,5" data-val="3"></div></div>
+      <div class="field"><span>Bot skill</span><div class="chips" id="pick-skill" data-opts="easy,normal,hard" data-val="normal"></div></div>
+      <div class="field"><span>Trading days</span><div class="chips" id="pick-days" data-opts="6,10,15" data-val="10"></div></div>
+      <div class="field"><span>Day length</span><div class="chips" id="pick-len" data-opts="45,60,90" data-labels="45s,60s,90s" data-val="60"></div></div>
+    </div>
+    <button class="btn gold big" id="btn-start">🔔 Ring the opening bell</button>
+  </div>
+</section>
+
+<!-- Online lobby -->
+<section id="scr-online" class="screen">
+  <div class="panel setup">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>Play online</h2></header>
+    <div id="online-home">
+      <label>Your name<input id="in-name-on" maxlength="14" placeholder="Trader"></label>
+      <div class="online-cols">
+        <div class="ocard">
+          <h3>Host a room</h3>
+          <p>Create a room and share the 5-letter code with friends.</p>
+          <button class="btn gold" id="btn-host">Create room</button>
+        </div>
+        <div class="ocard">
+          <h3>Join a room</h3>
+          <input id="in-code" maxlength="5" placeholder="CODE" class="code-in">
+          <button class="btn" id="btn-join">Join</button>
+        </div>
+      </div>
+      <p class="hint">Online play connects phones directly. All players need internet. Works best on Wi-Fi.</p>
+    </div>
+    <div id="online-lobby" class="hidden">
+      <div class="room-code">Room code <b id="room-code">-----</b></div>
+      <ul id="lobby-list" class="lobby-list"></ul>
+      <div id="host-ctrl" class="hidden">
+        <div class="field"><span>Trading days</span><div class="chips" id="pick-days-on" data-opts="6,10,15" data-val="10"></div></div>
+        <div class="field"><span>Day length</span><div class="chips" id="pick-len-on" data-opts="45,60,90" data-labels="45s,60s,90s" data-val="60"></div></div>
+        <div class="row"><button class="btn ghost" id="btn-addbot">+ Add bot</button><button class="btn gold" id="btn-host-start">Start game</button></div>
+      </div>
+      <p class="hint" id="lobby-msg">Waiting for players...</p>
+    </div>
+  </div>
+</section>
+
+<!-- How to play -->
+<section id="scr-howto" class="screen">
+  <div class="panel howto">
+    <header><button class="icon-btn" data-go="title">‹</button><h2>How to play</h2></header>
+    <div class="howto-body" id="howto-body"></div>
+  </div>
+</section>
+
+<!-- Game -->
+<section id="scr-game" class="screen">
+  <div class="topbar">
+    <div class="tb-logo">BULL<span>RUSH</span></div>
+    <div class="tb-day"><small>DAY</small><b id="tb-day">1/10</b></div>
+    <div class="tb-phase" id="tb-phase"><span class="dot"></span><span id="tb-phase-txt">PRE-OPEN</span><b id="tb-timer"></b></div>
+    <div class="tb-index"><small>RUSH 30</small><b id="tb-index">10,000</b><i id="tb-index-chg">0.00%</i></div>
+    <div class="tb-money"><small>CASH</small><b id="tb-cash">₹0</b></div>
+    <div class="tb-money"><small>NET WORTH</small><b id="tb-worth">₹0</b><i id="tb-worth-chg"></i></div>
+    <button class="btn small" id="btn-bank">🏦 Bank</button>
+    <button class="btn small gold" id="btn-bell">🔔 Close day</button>
+    <button class="icon-btn" id="btn-menu">☰</button>
+  </div>
+  <div class="main">
+    <div class="col list" id="stock-list"></div>
+    <div class="col detail" id="detail"></div>
+    <div class="col side">
+      <div class="tabs" id="side-tabs">
+        <button data-tab="tips" class="on">Tips</button>
+        <button data-tab="ipo">IPO<i id="ipo-dot" class="badge hidden">•</i></button>
+        <button data-tab="rivals">Rivals</button>
+        <button data-tab="news">News</button>
+      </div>
+      <div class="tab-body" id="tab-body"></div>
+    </div>
+  </div>
+  <div class="ticker"><div class="ticker-inner" id="ticker"></div></div>
+</section>
+
+<div id="modal" class="modal hidden"><div class="modal-card" id="modal-card"></div></div>
+<div id="toast" class="toast"></div>
+
+<script src="vendor/peerjs.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/net.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
