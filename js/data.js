@@ -40,7 +40,7 @@
   // Special (gold) cards: playing one uses your turn. target = needs a company.
   BR.SPECIALS = {
     RIGHTS: { name: 'Rights Offer', icon: '🎟', target: true, own: true, desc: 'Buy 1 extra share for every 2 you own, at half price, right now.' },
-    SCAM: { name: 'Scam Exposed', icon: '🚨', target: true, desc: 'Company crashes −₹40 at the reveal.' },
+    SCAM: { name: 'Scam Exposed', icon: '🚨', target: true, secret: true, desc: 'Company crashes −₹40 at the reveal. Secret: rivals only see that you played a card.' },
     FREEZE: { name: 'Trading Freeze', icon: '🔒', target: true, desc: 'Company does not move at all this round.' },
     RUPUP: { name: 'Rupee Rocket', icon: '🚀', target: false, desc: 'Every company rises 10% at the reveal.' },
     RUPDN: { name: 'Rupee Slide', icon: '📉', target: false, desc: 'Every company falls 10% at the reveal.' },

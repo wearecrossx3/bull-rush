@@ -474,11 +474,16 @@
       } else if (k.sp === 'LUCKY') {
         p.cash += 100000;
         trade(s, p, 'bonus', null, 0, 100000, 'Lucky Bonus');
+      } else if (def.secret) {
+        // stays hidden from rivals until the reveal, so nobody can dump the shares in time
+        s.plays.push({ sp: k.sp, tk: c.tk, who: p.name, pid: p.id, secret: true });
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else {
         s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id });
         trade(s, p, 'gold', c ? c.tk : null, 0, 0, `${def.icon} ${def.name}`);
       }
-      log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
+      if (def.secret) log(s, `🤫 ${p.name} played a secret card. Find out at the reveal!`, 'corp');
+      else log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
       p.gold.splice(i, 1);
       return 'turn';
     },
@@ -604,6 +609,7 @@
       p.goldCount = p.gold.length;
       if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; p.tip = null; }
     }
+    v.plays = v.plays.filter((x) => !x.secret || x.pid === pid);
     return v;
   };
 

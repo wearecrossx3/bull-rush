@@ -63,7 +63,7 @@
   // ---------------------------------------------------------------- screens
   let rainT = null;
   function show(id) {
-    $$('.screen').forEach((s) => s.classList.toggle('active', s.id === 'scr-' + id));
+    $$('.screen').forEach((s) => { if (s.id !== 'scr-splash' && s.id !== 'scr-studio') s.classList.toggle('active', s.id === 'scr-' + id); });
     UI.screen = id;
     if (id === 'title') { startRain(); renderHome(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
@@ -122,7 +122,8 @@
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
     $('#btn-stats').onclick = () => { BR.sfx('tap'); statsModal(); };
-    $('#btn-settings').onclick = () => { BR.sfx('tap'); settingsModal(); };
+    $('#btn-settings').onclick = $('#btn-settings2').onclick = () => { BR.sfx('tap'); settingsModal(); if (UI.screen === 'title') renderHome(); };
+    $('#btn-sound-home').onclick = () => { BR.sound.toggle(); BR.sfx('tap'); renderHome(); };
     applyPrefs();
     $('#btn-host').onclick = hostRoom;
     $('#btn-join').onclick = joinRoom;
@@ -180,11 +181,43 @@
     'Tip: 🕵️ Insider Tip shows the hidden market cards nobody else can see.',
     'Tip: tap any player to see what they own and their latest moves.',
   ];
+  // trader level from lifetime stats: every game, win and podium earns XP
+  function level(st) {
+    const xp = st.played * 50 + st.wins * 150 + st.podium * 50;
+    const lv = Math.floor(Math.sqrt(xp / 100)) + 1;
+    const lo = (lv - 1) * (lv - 1) * 100, hi = lv * lv * 100;
+    return { lv, pct: Math.round((xp - lo) / (hi - lo) * 100) };
+  }
+  const RANKS = ['New trader', 'Day trader', 'Swing trader', 'Market maker', 'Fund manager', 'Big bull', 'Market legend'];
   function renderHome() {
     const pr = store.get('br.profile', { name: 'Trader', avatar: BR.AVATARS[0] });
     const st = stats();
-    $('#profile-strip').innerHTML = `<span class="ps-av">${esc(pr.avatar || '🦁')}</span><span class="ps-name"><b>${esc(pr.name || 'Trader')}</b><small>${st.played ? `${st.wins} wins · ${st.played} games` : 'New trader'}</small></span>${st.best ? `<span class="ps-best"><small>BEST</small>${rs(st.best)}</span>` : ''}`;
+    const L = level(st);
+    $('#profile-strip').innerHTML = `<span class="ps-av">${esc(pr.avatar || '🦁')}<i class="lv">${L.lv}</i></span><span class="ps-name"><b>${esc(pr.name || 'Trader')}</b><small>${RANKS[Math.min(RANKS.length - 1, Math.floor((L.lv - 1) / 2))]}</small><i class="xp"><i style="width:${L.pct}%"></i></i></span>`;
+    $('#hud-best').textContent = st.best ? `🏆 ${rs(st.best)}` : '';
+    $('#btn-sound-home').textContent = BR.sound.on ? '🔊' : '🔇';
     $('#tip-line').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+    if (!$('#ticker').childElementCount) {
+      const items = BR.COMPANY_POOL.map((c) => {
+        const px = 20 + Math.floor(Math.random() * 18) * 5, ch = (Math.floor(Math.random() * 7) - 3) * 5 || 5;
+        return `<span><b>${c.tk}</b> ₹${px} <em class="${ch > 0 ? 'up' : 'down'}">${ch > 0 ? '▲' : '▼'}${Math.abs(ch)}</em></span>`;
+      }).join('');
+      $('#ticker').innerHTML = items;
+    }
+  }
+  // launch sequence: studio card, then the game splash, then home. A tap skips each step.
+  function splash() {
+    const st = $('#scr-studio'), sp = $('#scr-splash');
+    const fade = (el) => { el.classList.add('out'); setTimeout(() => el.classList.remove('active'), 520); };
+    let stage = 0, t = null;
+    const next = () => {
+      clearTimeout(t);
+      if (stage === 0) { stage = 1; fade(st); sp.classList.add('go'); t = setTimeout(next, 2500); }
+      else if (stage === 1) { stage = 2; fade(sp); }
+    };
+    st.addEventListener('click', next);
+    sp.addEventListener('click', next);
+    t = setTimeout(next, 2200);
   }
   function statsModal() {
     const st = stats();
@@ -375,7 +408,7 @@
     el.style.setProperty('--cols', Math.ceil(list.length / (list.length > 10 ? 3 : 2)));
     el.dataset.n = list.length;
     const playsOn = {};
-    for (const x of v.plays) if (x.tk) (playsOn[x.tk] = playsOn[x.tk] || []).push(BR.SPECIALS[x.sp].icon);
+    for (const x of v.plays) if (x.tk && (!x.secret || x.pid === me.id)) (playsOn[x.tk] = playsOn[x.tk] || []).push(BR.SPECIALS[x.sp].icon);
     const now = Date.now();
     el.innerHTML = list.map((c) => {
       const price = U.priceOf(c);
@@ -688,7 +721,7 @@
       }
     } else if (k === 'endgame') { if (send({ type: 'endgame' })) { closeModal(true); banner('🏁 Final round!', 'gold'); } }
     else if (k.startsWith('pref:')) { const [, key, val] = k.split(':'); const p = prefs(); p[key] = val === 'true' ? true : val === 'false' ? false : val; store.set('br.prefs', p); applyPrefs(); settingsModal(); }
-    else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); }
+    else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); if (UI.screen === 'title') renderHome(); }
     else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); statsModal(); renderHome(); }
     else if (k.startsWith('fi:')) { UI.foundName = ($('#found-name') || {}).value; UI.foundIssue = +k.slice(3); foundModal(v, me); }
     else if (k === 'found') {
@@ -1071,7 +1104,7 @@
     <h4>💥 Bankrupt and 🎉 bonus</h4><ul><li>A company that falls to ₹0 goes bankrupt and its shares are wiped out. It comes back next round at its starting price.</li>
     <li>At ₹250 a company gives a 1:1 bonus: shares double, price halves.</li></ul>
     <h4>✨ Gold cards</h4><p>Everyone starts with 3 and keeps them until played. Players in the bottom half get a new one after each reveal, so nobody runs away with the game.</p>
-    <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40 · 🔒 Trading Freeze: no move</li>
+    <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40, kept secret until the reveal · 🔒 Trading Freeze: no move</li>
     <li>🚀 Rupee Rocket: all +10% · 📉 Rupee Slide: all −10% · 🚧 Upper Limit: max +₹15 · 🪂 Lower Limit: max −₹15</li>
     <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li>
     <li>🐂 Bull Charge: +₹25 · 🎲 Double Trouble: moves ×2 · 🛟 Safety Net: the bank covers your loss on one company</li>
@@ -1084,4 +1117,5 @@
 
   setupScreens();
   show('title');
+  splash();
 })(window.BR = window.BR || {});

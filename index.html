@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#4a2c12">
+<meta name="theme-color" content="#141c33">
 <title>Bull Rush</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -16,52 +16,99 @@
 </head>
 <body>
 
+<!-- Studio intro -->
+<section id="scr-studio" class="screen active">
+  <div class="studio-box">
+    <svg viewBox="0 0 120 120" class="studio-mark" aria-hidden="true">
+      <rect x="6" y="6" width="108" height="108" rx="28" fill="none" stroke="#ffc21a" stroke-width="6" class="sm-ring"/>
+      <path d="M38 38 L82 82" stroke="#fff" stroke-width="14" stroke-linecap="round" class="sm-a"/>
+      <path d="M82 38 L38 82" stroke="#ffc21a" stroke-width="14" stroke-linecap="round" class="sm-b"/>
+    </svg>
+    <div class="studio-name">CROSSX <span>STUDIOS</span></div>
+    <div class="studio-sub">presents</div>
+  </div>
+</section>
+
+<!-- Splash -->
+<section id="scr-splash" class="screen lobby active">
+  <div class="rays"></div>
+  <div class="splash-box">
+    <svg viewBox="0 0 200 170" class="mascot pop" aria-hidden="true"><use href="#bull"/></svg>
+    <h1 class="wordmark"><span class="w1">BULL</span> <span class="w2">RUSH</span></h1>
+    <div class="ribbon"><span>STOCK MARKET PARTY GAME</span></div>
+    <div class="loadbar"><i></i></div>
+    <p class="load-txt" id="load-txt">Ringing the opening bell…</p>
+  </div>
+  <div class="splash-foot">All companies, logos and events are fictional</div>
+</section>
+
 <!-- Title -->
-<section id="scr-title" class="screen active">
+<section id="scr-title" class="screen lobby">
+  <div class="rays"></div>
+  <svg class="bg-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 92 L30 80 L55 86 L85 62 L110 70 L140 48 L170 58 L200 36 L230 44 L260 24 L290 32 L320 14 L350 20 L400 4 L400 100 L0 100 Z" fill="url(#chartfill)"/>
+    <path d="M0 92 L30 80 L55 86 L85 62 L110 70 L140 48 L170 58 L200 36 L230 44 L260 24 L290 32 L320 14 L350 20 L400 4" fill="none" stroke="#34d399" stroke-width="2" vector-effect="non-scaling-stroke" opacity=".7"/>
+  </svg>
   <div class="coin-rain" id="coin-rain"></div>
+  <div class="hud">
+    <button class="hud-prof" id="profile-strip" data-go="setup"></button>
+    <div class="hud-right">
+      <span class="hud-pill" id="hud-best"></span>
+      <button class="hud-ic" id="btn-sound-home" aria-label="Sound">🔊</button>
+      <button class="hud-ic" id="btn-settings" aria-label="Settings">⚙️</button>
+    </div>
+  </div>
   <div class="title-wrap">
     <div class="logo">
-      <svg viewBox="0 0 200 170" class="mascot" aria-hidden="true">
-        <defs>
-          <radialGradient id="mg" cx=".45" cy=".35" r=".7"><stop offset="0" stop-color="#ffe58a"/><stop offset="1" stop-color="#f5a800"/></radialGradient>
-          <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e4"/><stop offset="1" stop-color="#e2c697"/></linearGradient>
-        </defs>
-        <ellipse cx="100" cy="160" rx="62" ry="8" fill="#7a4f24" opacity=".25"/>
-        <circle cx="100" cy="92" r="64" fill="url(#mg)" stroke="#a86c00" stroke-width="5"/>
-        <circle cx="100" cy="92" r="52" fill="none" stroke="#fff3c2" stroke-width="3" stroke-dasharray="6 7" opacity=".8"/>
-        <path d="M46 52 C 22 46, 14 22, 30 8 C 32 26, 46 36, 62 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
-        <path d="M154 52 C 178 46, 186 22, 170 8 C 168 26, 154 36, 138 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
-        <ellipse cx="100" cy="98" rx="40" ry="38" fill="#8a5a2b" stroke="#4a2c12" stroke-width="4"/>
-        <ellipse cx="100" cy="118" rx="26" ry="17" fill="#f3b9a0" stroke="#4a2c12" stroke-width="4"/>
-        <circle cx="91" cy="118" r="4" fill="#4a2c12"/><circle cx="109" cy="118" r="4" fill="#4a2c12"/>
-        <circle cx="84" cy="88" r="7" fill="#fff"/><circle cx="116" cy="88" r="7" fill="#fff"/>
-        <circle cx="86" cy="89" r="3.6" fill="#1b1400"/><circle cx="118" cy="89" r="3.6" fill="#1b1400"/>
-        <path d="M74 76 L92 81 M126 76 L108 81" stroke="#4a2c12" stroke-width="4" stroke-linecap="round"/>
-        <path d="M60 150 L88 124 L104 134 L140 100" fill="none" stroke="#12a46e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M128 96 L150 92 L146 114 Z" fill="#12a46e"/>
-      </svg>
-      <h1>BULL <span>RUSH</span></h1>
-      <p class="tag">The stock market party game</p>
+      <div class="mascot-wrap"><span class="glow"></span><svg viewBox="0 0 200 170" class="mascot" aria-hidden="true"><use href="#bull"/></svg><i class="spk s1">✦</i><i class="spk s2">✦</i><i class="spk s3">✦</i></div>
+      <h1 class="wordmark"><span class="w1">BULL</span> <span class="w2">RUSH</span></h1>
+      <div class="ribbon"><span>STOCK MARKET PARTY GAME</span></div>
     </div>
     <div class="menu-btns">
-      <div class="profile-strip" id="profile-strip"></div>
-      <button class="mbtn play" data-go="setup"><span class="mi">🎲</span><span><b>Play vs Computer</b><small>Pick bots, rounds and skill</small></span></button>
-      <button class="mbtn quick" id="btn-quick"><span class="mi">⚡</span><span><b>Quick Game</b><small>3 bots · 6 rounds · start now</small></span></button>
-      <button class="mbtn online" data-go="online"><span class="mi">🌐</span><span><b>Play Online</b><small>Rooms with friends</small></span></button>
-      <button class="mbtn cont hidden" id="btn-continue"><span class="mi">⟲</span><span><b>Continue</b><small>Your saved game</small></span></button>
-      <div class="row three">
-        <button class="btn" data-go="howto">📘 Rules</button>
-        <button class="btn" id="btn-stats">🏆 Stats</button>
-        <button class="btn" id="btn-settings">⚙️ Settings</button>
+      <button class="gbtn play" data-go="setup"><span class="shine"></span><span class="gi">🎲</span><span class="gt"><b>PLAY</b><small>vs Computer · 1 to 5 bots</small></span></button>
+      <button class="gbtn cont hidden" id="btn-continue"><span class="gi">⟲</span><span class="gt"><b>CONTINUE</b><small>Pick up your saved game</small></span></button>
+      <div class="tiles">
+        <button class="gbtn tile quick" id="btn-quick"><span class="gi">⚡</span><span class="gt"><b>QUICK</b><small>Start in 1 tap</small></span></button>
+        <button class="gbtn tile online" data-go="online"><span class="gi">🌐</span><span class="gt"><b>ONLINE</b><small>With friends</small></span></button>
+      </div>
+      <div class="round-row">
+        <button class="rbtn" data-go="howto"><span>📘</span><small>Rules</small></button>
+        <button class="rbtn" id="btn-stats"><span>🏆</span><small>Stats</small></button>
+        <button class="rbtn" id="btn-settings2"><span>⚙️</span><small>Settings</small></button>
       </div>
     </div>
   </div>
   <div class="tip-line" id="tip-line"></div>
-  <div class="version">v5.2 · All companies, logos and events are fictional</div>
+  <div class="ticker"><div class="ticker-track" id="ticker"></div></div>
+  <div class="version">v5.3 · All companies, logos and events are fictional</div>
 </section>
 
+<!-- shared art -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="mg" cx=".45" cy=".35" r=".7"><stop offset="0" stop-color="#ffe58a"/><stop offset="1" stop-color="#f5a800"/></radialGradient>
+    <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e4"/><stop offset="1" stop-color="#e2c697"/></linearGradient>
+    <linearGradient id="chartfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".28"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></linearGradient>
+    <g id="bull">
+      <ellipse cx="100" cy="160" rx="62" ry="8" fill="#000" opacity=".25"/>
+      <circle cx="100" cy="92" r="64" fill="url(#mg)" stroke="#a86c00" stroke-width="5"/>
+      <circle cx="100" cy="92" r="52" fill="none" stroke="#fff3c2" stroke-width="3" stroke-dasharray="6 7" opacity=".8"/>
+      <path d="M46 52 C 22 46, 14 22, 30 8 C 32 26, 46 36, 62 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M154 52 C 178 46, 186 22, 170 8 C 168 26, 154 36, 138 40 Z" fill="url(#hg)" stroke="#7a4f24" stroke-width="4" stroke-linejoin="round"/>
+      <ellipse cx="100" cy="98" rx="40" ry="38" fill="#8a5a2b" stroke="#4a2c12" stroke-width="4"/>
+      <ellipse cx="100" cy="118" rx="26" ry="17" fill="#f3b9a0" stroke="#4a2c12" stroke-width="4"/>
+      <circle cx="91" cy="118" r="4" fill="#4a2c12"/><circle cx="109" cy="118" r="4" fill="#4a2c12"/>
+      <g class="eyes"><circle cx="84" cy="88" r="7" fill="#fff"/><circle cx="116" cy="88" r="7" fill="#fff"/>
+      <circle cx="86" cy="89" r="3.6" fill="#1b1400"/><circle cx="118" cy="89" r="3.6" fill="#1b1400"/></g>
+      <path d="M74 76 L92 81 M126 76 L108 81" stroke="#4a2c12" stroke-width="4" stroke-linecap="round"/>
+      <path d="M60 150 L88 124 L104 134 L140 100" fill="none" stroke="#12a46e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M128 96 L150 92 L146 114 Z" fill="#12a46e"/>
+    </g>
+  </defs>
+</svg>
+
 <!-- Offline setup -->
-<section id="scr-setup" class="screen">
+<section id="scr-setup" class="screen lobby">
   <div class="panel setup">
     <header><button class="icon-btn" data-go="title">‹</button><h2>New game</h2></header>
     <div class="setup-grid">
@@ -78,7 +125,7 @@
 </section>
 
 <!-- Online lobby -->
-<section id="scr-online" class="screen">
+<section id="scr-online" class="screen lobby">
   <div class="panel setup">
     <header><button class="icon-btn" data-go="title">‹</button><h2>Play online</h2></header>
     <div id="online-home">
@@ -112,7 +159,7 @@
 </section>
 
 <!-- How to play -->
-<section id="scr-howto" class="screen">
+<section id="scr-howto" class="screen lobby">
   <div class="panel howto">
     <header><button class="icon-btn" data-go="title">‹</button><h2>How to play</h2></header>
     <div class="howto-body" id="howto-body"></div>
@@ -122,7 +169,7 @@
 <!-- Game -->
 <section id="scr-game" class="screen">
   <div class="topbar">
-    <div class="tb-logo">BULL<span>RUSH</span></div>
+    <div class="tb-logo">BULL <span>RUSH</span></div>
     <div class="tb-day"><small>ROUND</small><b id="tb-day">1/8</b></div>
     <div class="tb-turn" id="tb-turn">Your turn!</div>
     <div class="tb-money"><small>CASH</small><b id="tb-cash">₹0</b></div>
