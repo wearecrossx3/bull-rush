@@ -12,16 +12,20 @@
     const est = {};
     for (const c of s.companies) if (c.status === 'active' || c.status === 'ipo') est[c.tk] = (U.rnd(s) - 0.5) * st.noise;
     for (const k of p.hand) if (k.kind === 'price' && est[k.tk] !== undefined) est[k.tk] += k.v;
-    for (const x of s.plays) {
-      if (x.tk && est[x.tk] !== undefined) {
-        if (x.sp === 'BULL') est[x.tk] += 20;
-        if (x.sp === 'BEAR') est[x.tk] -= 20;
-        if (x.sp === 'DOUBLE') est[x.tk] *= 2;
-        if (x.sp === 'DIVIDEND') est[x.tk] += 5;
+    const rup = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
+    for (const t in est) {
+      const c = U.company(s, t);
+      est[t] += rup * c.price * 0.1;
+      for (const x of s.plays) {
+        if (x.tk !== t) continue;
+        if (x.sp === 'SCAM') est[t] -= 40;
+        if (x.sp === 'DIVIDEND') est[t] += 5;
+        if (x.sp === 'UPCAP') est[t] = Math.min(est[t], 15);
+        if (x.sp === 'LOWCAP') est[t] = Math.max(est[t], -15);
+        if (x.sp === 'FREEZE') est[t] = 0;
       }
-      if (x.sp === 'BOOM') for (const t in est) est[t] += 10;
-      if (x.sp === 'CRASH') for (const t in est) est[t] -= 10;
     }
+    if (p.spy) for (const k of p.spy.cards) if (k.kind === 'price' && est[k.tk] !== undefined) est[k.tk] += k.v;
     return est;
   }
 
@@ -42,13 +46,14 @@
       const owned = Object.keys(p.hold).filter((t) => U.company(s, t).status === 'active').sort((a, b) => p.hold[b] - p.hold[a]);
       const notOwned = Object.keys(est).filter((t) => !p.hold[t] && U.company(s, t).status === 'active').sort((a, b) => est[a] - est[b]);
       const k = sp.sp;
-      if ((k === 'BULL' || k === 'DIVIDEND' || k === 'GIFT') && owned[0]) return { type: 'special', card: sp.id, tk: owned[0] };
-      if (k === 'SHIELD' && owned.find((t) => est[t] < 0)) return { type: 'special', card: sp.id, tk: owned.find((t) => est[t] < 0) };
-      if (k === 'DOUBLE' && owned.find((t) => est[t] > 8)) return { type: 'special', card: sp.id, tk: owned.find((t) => est[t] > 8) };
-      if (k === 'BEAR' && notOwned[0]) return { type: 'special', card: sp.id, tk: notOwned[0] };
-      if (k === 'BOOM' && owned.length) return { type: 'special', card: sp.id };
-      if (k === 'CRASH' && !owned.length) return { type: 'special', card: sp.id };
-      if (k === 'LOOT') return { type: 'special', card: sp.id };
+      const fall = owned.find((t) => est[t] < -5);
+      if ((k === 'RIGHTS' || k === 'DIVIDEND') && owned[0] && est[owned[0]] >= 0) return { type: 'special', card: sp.id, tk: owned[0] };
+      if ((k === 'LOWCAP' || k === 'FREEZE') && fall) return { type: 'special', card: sp.id, tk: fall };
+      if (k === 'SCAM' && notOwned[0]) return { type: 'special', card: sp.id, tk: notOwned[0] };
+      if (k === 'UPCAP') { const t = Object.keys(est).filter((x) => !p.hold[x] && U.company(s, x).status === 'active').sort((a, b) => est[b] - est[a])[0]; if (t) return { type: 'special', card: sp.id, tk: t }; }
+      if (k === 'RUPUP' && owned.length) return { type: 'special', card: sp.id };
+      if (k === 'RUPDN' && !owned.length) return { type: 'special', card: sp.id };
+      if (k === 'SPY' && s.pass === 0) return { type: 'special', card: sp.id };
     }
 
     // 3. IPO if our cards say it will pop

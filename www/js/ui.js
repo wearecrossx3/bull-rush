@@ -254,6 +254,7 @@
       const bars = hist.map((h) => `<i style="height:${Math.max(8, (h / mx) * 100)}%"></i>`).join('');
       const stamp = c.status === 'bankrupt' ? '<div class="t-stamp">💥 BANKRUPT</div>' : c.status === 'ipo' ? '<div class="t-stamp">🚀 IPO</div>' : '';
       const price = c.status === 'ipo' ? c.issue : c.price;
+      const boss = c.status === 'active' && U.bossOf(v, c);
       return `<div class="tile${c.status === 'bankrupt' ? ' dead' : ''}${c.status === 'ipo' ? ' ipo' : ''}" style="--c:${c.color}" data-tile="${c.tk}">
         <div class="t-head"><span class="lg">${c.logo}</span>${c.tk}</div>
         <div class="t-name">${esc(c.name)}</div>
@@ -261,6 +262,7 @@
         <div class="t-price">₹${price}</div>
         <div class="t-bars">${showBars ? bars : ""}</div>
         ${own ? `<span class="t-own">${(own / 1000).toLocaleString('en-IN')}K</span>` : ''}
+        ${boss ? `<span class="t-boss" title="Big Boss">👑${esc(boss.avatar)}</span>` : ''}
         ${playsOn[c.tk] ? `<span class="t-chg flat" style="top:auto;bottom:24px">${playsOn[c.tk].join('')}</span>` : ''}
         ${stamp}
       </div>`;
@@ -283,12 +285,14 @@
     if (v.phase !== 'turns') { box.innerHTML = '<div>Round over. Check the reveal!</div>'; return; }
     const passLine = `Pass ${v.pass + 1} of ${v.settings.turns}`;
     const feed = v.feed.slice(0, 3).map((f) => `<div>• ${esc(f.text)}</div>`).join('');
+    const spyBtn = me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}'s hand</button>` : '';
     if (myTurn(v)) {
-      box.innerHTML = `<div><b>Your move</b> · ${passLine}<br>Tap a company to buy or sell, or play a gold card.</div>
-        <button class="btn green" data-act="pass">✋ Pass</button>`;
+      box.innerHTML = `<div class="act-tip">👆 Tap a company to <b>buy / sell</b><br>✨ or tap a gold card</div>
+        <button class="btn green" data-act="pass">✋ Pass</button>${spyBtn}`;
     } else {
-      box.innerHTML = `<div><b>${passLine}</b></div><div class="feed-mini">${feed}</div>`;
+      box.innerHTML = `<div><b>${passLine}</b></div><div class="feed-mini">${feed}</div>${spyBtn}`;
     }
+    if (UI.wantSpy && me.spy) { UI.wantSpy = false; spyModal(v, me); }
   }
 
   function renderHand(v, me) {
@@ -329,6 +333,7 @@
     }
     const act = e.target.closest('[data-act]');
     if (act && act.dataset.act === 'pass') send({ type: 'pass' });
+    if (act && act.dataset.act === 'spy') spyModal(v, me);
   });
 
   function send(a, okMsg) {
@@ -340,6 +345,7 @@
   }
 
   $('#btn-bank').onclick = () => { const v = UI.ctrl.view(); bankModal(v, meP(v)); };
+  $('#btn-dash').onclick = () => { const v = UI.ctrl.view(); dashModal(v, meP(v)); BR.sfx('tap'); };
   $('#btn-menu').onclick = () => menuModal();
 
   // ---------------------------------------------------------------- modals
@@ -384,7 +390,11 @@
       if (send({ type: 'ipo', blocks: UI.ipoBlocks }, `Applied for ${UI.ipoBlocks} IPO block(s)`)) { BR.sfx('coin'); closeModal(true); }
     } else if (k.startsWith('sp:')) {
       const [, card, tk] = k.split(':');
-      if (send({ type: 'special', card, tk: tk || undefined })) { BR.sfx('power'); closeModal(true); }
+      if (send({ type: 'special', card, tk: tk || undefined })) {
+        BR.sfx('power'); closeModal(true);
+        if (card && UI.ctrl.local) { const nv = UI.ctrl.view(); const nm = meP(nv); if (nm.spy) spyModal(nv, nm); }
+        else UI.wantSpy = true;
+      }
     } else if (k === 'loan' || k === 'repay') {
       if (send({ type: k })) BR.sfx('coin');
       setTimeout(() => { const nv = UI.ctrl.view(); bankModal(nv, meP(nv), true); }, UI.ctrl.local ? 0 : 400);
@@ -437,11 +447,41 @@
     let btns = '';
     if (!myTurn(v)) body += '<p class="hint">You can play it on your turn. Playing a card uses your turn.</p>';
     else if (d.target) {
-      const ok = v.companies.filter((c) => c.status === 'active' && (k.sp !== 'GIFT' || me.hold[c.tk]));
+      const ok = v.companies.filter((c) => c.status === 'active' && (!d.own || me.hold[c.tk]));
       body += ok.length ? `<div class="sec-h">CHOOSE A COMPANY</div><div class="cpick">${ok.map((c) => `<button style="--c:${c.color}" data-m="sp:${k.id}:${c.tk}">${c.logo} ${c.tk}</button>`).join('')}</div>`
         : '<p class="hint">You need to own a company first.</p>';
     } else btns = `<button class="btn gold" data-m="sp:${k.id}">Play ${d.name}</button>`;
     openModal('special', `<h2>${d.icon} ${d.name}</h2>${body}<div class="m-foot"><button class="btn" data-m="close">Close</button>${btns}</div>`, true);
+  }
+
+  function dashModal(v, me) {
+    const cos = v.companies.filter((c) => c.status !== 'bankrupt');
+    const head = cos.map((c) => `<th><span class="dlg" style="background:${c.color}">${c.logo}</span><br>${c.tk}<br><small>₹${c.status === 'ipo' ? c.issue : c.price}</small></th>`).join('');
+    const rows = v.players.map((p) => {
+      const cells = cos.map((c) => {
+        const q = p.hold[c.tk] || 0;
+        const boss = U.bossOf(v, c);
+        return `<td class="${q ? 'has' : ''}">${q ? (boss && boss.id === p.id ? '👑' : '') + (q / 1000) + 'K' : '·'}</td>`;
+      }).join('');
+      return `<tr class="${p.id === me.id ? 'me' : ''}"><th class="pn">${esc(p.avatar)} ${esc(p.name)}</th>${cells}<td class="money">${rs(p.cash)}</td><td class="money">${p.loan ? rs(p.loan) : '-'}</td><td class="money"><b>${rs(U.netWorth(v, p))}</b></td></tr>`;
+    }).join('');
+    const left = cos.map((c) => `<td>${c.status === 'active' ? (U.available(v, c) / 1000) + 'K' : '-'}</td>`).join('');
+    openModal('dash', `<h2>📊 Who owns what<small>👑 = Big Boss (most shares, at least 5K)</small></h2>
+      <div class="dash-wrap"><table class="dash"><thead><tr><th></th>${head}<th>Cash</th><th>Loan</th><th>Worth</th></tr></thead>
+      <tbody>${rows}<tr class="left"><th class="pn">📦 Shares left</th>${left}<td></td><td></td><td></td></tr></tbody></table></div>
+      <div class="m-foot"><button class="btn gold" data-m="close">Close</button></div>`);
+  }
+
+  function spyModal(v, me) {
+    const sp = me.spy;
+    if (!sp) return;
+    const cards = sp.cards.map((k) => {
+      if (k.kind === 'special') return `<div class="card sp mini"><div class="ic">${BR.SPECIALS[k.sp].icon}</div><div class="nm">${BR.SPECIALS[k.sp].name}</div></div>`;
+      const c = U.company(v, k.tk);
+      return `<div class="card mini" style="--c:${c ? c.color : '#999'}"><div class="band"><span>${c ? c.logo : ''}</span><span>${k.tk}</span></div><div class="val ${k.v > 0 ? 'up' : 'down'}">${sgn(k.v)}</div></div>`;
+    }).join('');
+    openModal('spy', `<h2>🔍 ${esc(sp.avatar)} ${esc(sp.who)}'s secret hand</h2><div class="spy-hand">${cards}</div>
+      <p class="hint">Only you can see this. It stays available this round from the 🔍 button.</p><div class="m-foot"><button class="btn gold" data-m="close">Got it</button></div>`);
   }
 
   function bankModal(v, me, refresh) {
@@ -487,7 +527,7 @@
     const r = v.reveal;
     const myPl = r.pl[me.id] || 0;
     const rows = r.rows.map((x, i) => {
-      const cards = x.cards.map((k) => `<span class="${cls(k.v)}" title="${esc(k.who)}">${esc(k.avatar || '')}${sgn(k.v)}</span>`).join('')
+      const cards = x.cards.map((k) => `<span class="${cls(k.v)}" title="${esc(k.who)}">${esc(k.avatar || '')}${k.blocked ? '<s>' + sgn(k.v) + '</s>' : sgn(k.v)}</span>`).join('')
         + x.mods.map((m) => `<span class="mod">${m}</span>`).join('');
       return `<div class="rev-row" style="animation-delay:${i * 0.18}s">
         <div class="lg" style="background:${x.color}">${x.logo}</div><b>${x.tk}${me.hold[x.tk] ? ' <small style="color:var(--gold)">●</small>' : ''}</b>
@@ -584,8 +624,11 @@
     <h4>🎉 The big reveal</h4><p>When the round ends, <b>every</b> player's cards are flipped. Each company moves by the total of all cards for it. Your cards are only part of the story, so watch what rivals buy and sell!</p>
     <h4>💥 Bankrupt and 🎉 bonus</h4><ul><li>If a company falls to ₹0 it goes bankrupt and all its shares are wiped out. It returns next round at its starting price.</li>
     <li>If a company reaches ₹250, it gives a 1:1 bonus: your shares double and the price halves.</li></ul>
-    <h4>✨ Gold cards</h4><ul><li>🐂 Bull Run +₹20 · 🐻 Bear Attack −₹20 · 🛡 Safe Shield (cannot fall) · ✖2 Double Trouble</li>
-    <li>💰 Dividend Day ₹5/share · 🎁 Bonus Gift (free shares) · 🌦 Monsoon Boom (all +₹10) · 🌪 Market Crash (all −₹10) · 🪙 Broker Fees (collect ₹25,000 from everyone)</li></ul>
+    <h4>👑 Big Boss</h4><p>Whoever owns the most shares of a company (at least 5,000) is its Big Boss. At the reveal, the Boss blocks the single worst card for that company.</p>
+    <h4>📦 Limited shares</h4><p>Each company has only 1,00,000 shares on the table. Tap 📊 Shares to see who owns what.</p>
+    <h4>✨ Gold cards</h4><ul><li>🎟 Rights Offer: buy extra shares at half price · 🚨 Scam Exposed: −₹40 · 🔒 Trading Freeze: no move</li>
+    <li>🚀 Rupee Rocket: all +10% · 📉 Rupee Slide: all −10% · 🚧 Upper Limit: max +₹15 · 🪂 Lower Limit: max −₹15</li>
+    <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's whole hand</li></ul>
     <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn at the issue price. If too many blocks are asked for, everyone gets a fair share. It lists at the reveal and its cards move it straight away.</p>
     <h4>🏦 Bank</h4><p>Borrow ₹1 lakh at a time (up to ₹3 lakh) any time without using your turn. 10% interest per round.</p>
     <h4>🌐 Online</h4><p>One player hosts a room and shares the 5-letter code. Up to 6 players, and bots can fill empty seats.</p>`;

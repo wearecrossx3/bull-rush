@@ -34,13 +34,26 @@
     if (a >= 1e5) return (n / 1e5).toFixed(2) + ' L';
     return Math.round(n).toLocaleString('en-IN');
   }
-  function maxBlocks(s, p, c) { return c.status === 'active' ? Math.floor(p.cash / (c.price * R.block)) : 0; }
+  // The player holding the most shares of a company (at least bossMin, no tie) is its Big Boss.
+  function bossOf(s, c) {
+    let best = null, tie = false;
+    for (const p of s.players) {
+      const q = p.hold[c.tk] || 0;
+      if (q < R.bossMin) continue;
+      if (!best || q > best.hold[c.tk]) { best = p; tie = false; } else if (q === best.hold[c.tk]) tie = true;
+    }
+    return tie ? null : best;
+  }
+  // Each company has a limited pile of shares; what players hold is gone from the pile.
+  function available(s, c) { return (c.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
+  function maxBlocks(s, p, c) { return c.status === 'active' ? Math.max(0, Math.min(Math.floor(p.cash / (c.price * R.block)), Math.floor(available(s, c) / R.block))) : 0; }
 
   function tier(c) {
-    if (c.price < 35) return [5, 10, 15];
-    if (c.price < 70) return [5, 10, 15, 20];
-    if (c.price < 120) return [10, 15, 20, 25];
-    return [10, 20, 25, 30, 40];
+    if (c.price < 20) return [5];
+    if (c.price < 40) return [5, 10];
+    if (c.price < 70) return [5, 10, 15];
+    if (c.price < 120) return [10, 15, 20];
+    return [10, 20, 25, 30];
   }
 
   function newCompany(def) {
@@ -86,7 +99,7 @@
 
     for (const c of s.companies) {
       if (c.status === 'bankrupt') {
-        c.status = 'active'; c.price = c.start; c.history.push(c.start);
+        c.status = 'active'; c.price = c.start; c.supply = R.supply; c.history.push(c.start);
         log(s, `${c.name} is back on the board at ₹${c.start} after restructuring.`, 'corp');
       }
     }
@@ -120,6 +133,7 @@
       if (rnd(s) < R.specialChance) p.hand.push({ id: 'x' + s.round + p.seat, kind: 'special', sp: pick(s, specials) });
       p.hand.sort((a, b) => (a.kind === b.kind ? (a.tk || '').localeCompare(b.tk || '') : a.kind === 'special' ? 1 : -1));
       p.ipoBlocks = 0;
+      p.spy = null;
       p.ready = !!p.bot;
     }
     s.market = deck; // leftover cards nobody holds
@@ -169,22 +183,25 @@
       c.history = [c.issue];
     }
 
-    const allBoom = s.plays.filter((x) => x.sp === 'BOOM').length - s.plays.filter((x) => x.sp === 'CRASH').length;
+    const rupee = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
     for (const c of s.companies) {
       if (c.status !== 'active') continue;
       const cards = [];
       for (const p of s.players) for (const k of p.hand) if (k.kind === 'price' && k.tk === c.tk) cards.push({ who: p.name, v: k.v, avatar: p.avatar });
       for (const k of s.market) if (k.tk === c.tk) cards.push({ who: 'Market', v: k.v, avatar: '🏛' });
-      let total = cards.reduce((a, k) => a + k.v, 0);
       const mods = [];
-      for (const x of s.plays) {
-        if (x.tk !== c.tk) continue;
-        if (x.sp === 'BULL') { total += 20; mods.push('🐂 +20'); }
-        if (x.sp === 'BEAR') { total -= 20; mods.push('🐻 −20'); }
+      const boss = bossOf(s, c);
+      if (boss) {
+        const worst = cards.filter((k) => k.v < 0).sort((a, b) => a.v - b.v)[0];
+        if (worst) { worst.blocked = true; mods.push(`👑 ${boss.name} blocked ${worst.v}`); }
       }
-      if (s.plays.some((x) => x.sp === 'DOUBLE' && x.tk === c.tk)) { total *= 2; mods.push('✖2'); }
-      if (allBoom) { total += allBoom * 10; mods.push(allBoom > 0 ? '🌦 +10' : '🌪 −10'); }
-      if (total < 0 && s.plays.some((x) => x.sp === 'SHIELD' && x.tk === c.tk)) { total = 0; mods.push('🛡 blocked'); }
+      let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v), 0);
+      const on = (sp) => s.plays.some((x) => x.sp === sp && x.tk === c.tk);
+      if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
+      if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
+      if (on('UPCAP') && total > 15) { total = 15; mods.push('🚧 max +15'); }
+      if (on('LOWCAP') && total < -15) { total = -15; mods.push('🪂 max −15'); }
+      if (on('FREEZE')) { total = 0; mods.push('🔒 frozen'); }
       const from = c.price;
       let to = Math.max(0, from + total);
       const row = { tk: c.tk, name: c.name, logo: c.logo, color: c.color, from, to, total, cards, mods, note: '' };
@@ -202,6 +219,7 @@
         to = 0;
       } else if (to >= R.splitAt) {
         for (const p of s.players) if (p.hold[c.tk]) p.hold[c.tk] *= 2;
+        c.supply = (c.supply || R.supply) * 2;
         to = Math.round(to / 2);
         row.note = '🎉 1:1 BONUS! Shares doubled, price halved';
         log(s, `${c.name} hit ₹${R.splitAt}: bonus issue, shares doubled!`, 'up');
@@ -253,6 +271,7 @@
       if (!(b > 0)) return 'Choose how many blocks';
       const cost = b * R.block * c.price;
       if (cost > p.cash) return 'Not enough cash';
+      if (b * R.block > available(s, c)) return `Only ${fmt(available(s, c))} ${c.tk} shares left`;
       p.cash -= cost;
       p.hold[c.tk] = (p.hold[c.tk] || 0) + b * R.block;
       log(s, `${p.name} bought ${fmt(b * R.block)} ${c.tk} @ ₹${c.price}`, 'up');
@@ -286,17 +305,19 @@
       const def = BR.SPECIALS[k.sp];
       const c = a.tk && company(s, a.tk);
       if (def.target && (!c || c.status !== 'active')) return 'Pick a company on the board';
-      if (k.sp === 'GIFT') {
-        if (!p.hold[c.tk]) return 'You must own that company';
-        const add = Math.min(R.giftMax, Math.floor(p.hold[c.tk] / 2 / R.block) * R.block || R.block);
-        p.hold[c.tk] += add;
-        log(s, `🎁 ${p.name} got ${fmt(add)} free ${c.tk} shares!`, 'up');
-      } else if (k.sp === 'LOOT') {
-        const victims = s.players.filter((o) => o.id !== p.id && o.cash > 0);
-        let got = 0;
-        for (const o of victims) { const t = Math.min(o.cash, R.lootEach); o.cash -= t; got += t; }
-        p.cash += got;
-        log(s, `🪙 ${p.name} collected ₹${fmt(got)} in brokerage fees from everyone!`, 'up');
+      if (def.own && !p.hold[c.tk]) return 'You must own that company';
+      if (k.sp === 'RIGHTS') {
+        const half = Math.max(1, Math.round(c.price / 2));
+        let add = Math.min(R.rightsMax, Math.floor(p.hold[c.tk] / 2 / R.block) * R.block || R.block);
+        add = Math.min(add, Math.floor(p.cash / half / R.block) * R.block, Math.floor(available(s, c) / R.block) * R.block);
+        if (!add) return 'Not enough cash for the rights shares';
+        p.cash -= add * half; p.hold[c.tk] += add;
+        log(s, `🎟 ${p.name} bought ${fmt(add)} ${c.tk} rights shares at ₹${half}!`, 'up');
+      } else if (k.sp === 'SPY') {
+        const rivals = s.players.filter((o) => o.id !== p.id);
+        const o = rivals[Math.floor(rnd(s) * rivals.length)];
+        p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
+        log(s, `🔍 ${p.name} is spying on ${o.name}'s hand!`, 'corp');
       } else {
         s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name });
         log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
@@ -366,10 +387,10 @@
     v.market = [];
     for (const p of v.players) {
       p.handCount = p.hand.length;
-      if (p.id !== pid) p.hand = [];
+      if (p.id !== pid) { p.hand = []; p.spy = null; }
     }
     return v;
   };
 
-  BR.util = { netWorth, holdingsValue, maxBlocks, company, player, current, fmt, rnd, pick };
+  BR.util = { available, bossOf, netWorth, holdingsValue, maxBlocks, company, player, current, fmt, rnd, pick };
 })(window.BR = window.BR || {});

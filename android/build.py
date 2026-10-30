@@ -134,7 +134,7 @@ def manifest():
                          A("theme", T_REF, THEME_FULLSCREEN), A("allowBackup", T_BOOL, -1),
                          A("hardwareAccelerated", T_BOOL, -1)], [
             ("activity", [A("name", T_STRING, PACKAGE + ".MainActivity"), A("exported", T_BOOL, -1),
-                          A("launchMode", T_DEC, 2), A("screenOrientation", T_DEC, 6),  # singleTask, sensorLandscape
+                          A("launchMode", T_DEC, 2), A("screenOrientation", T_DEC, 4),  # singleTask, sensor (portrait or landscape)
                           A("configChanges", T_HEX, config_changes)], [
                 ("intent-filter", [], [
                     ("action", [A("name", T_STRING, "android.intent.action.MAIN")]),

@@ -31,17 +31,17 @@
     { tk: 'PAYW', name: 'Paywave', sector: 'BANK', start: 45, logo: '₹', pitch: 'UPI payments for 40 lakh shops' },
   ];
 
-  // Special cards: playing one uses your turn. target = needs a company.
+  // Special (gold) cards: playing one uses your turn. target = needs a company.
   BR.SPECIALS = {
-    BULL: { name: 'Bull Run', icon: '🐂', target: true, desc: 'Company jumps +₹20 at the reveal.' },
-    BEAR: { name: 'Bear Attack', icon: '🐻', target: true, desc: 'Company drops −₹20 at the reveal.' },
-    SHIELD: { name: 'Safe Shield', icon: '🛡', target: true, desc: 'Company cannot fall this round.' },
-    DOUBLE: { name: 'Double Trouble', icon: '✖2', target: true, desc: 'Doubles this round\'s move, up or down.' },
-    DIVIDEND: { name: 'Dividend Day', icon: '💰', target: true, desc: 'All holders get ₹5 per share at the reveal.' },
-    GIFT: { name: 'Bonus Gift', icon: '🎁', target: true, desc: 'Get free shares (half your holding, up to 5,000).' },
-    BOOM: { name: 'Monsoon Boom', icon: '🌦', target: false, desc: 'Every company +₹10 at the reveal.' },
-    CRASH: { name: 'Market Crash', icon: '🌪', target: false, desc: 'Every company −₹10 at the reveal.' },
-    LOOT: { name: 'Broker Fees', icon: '🪙', target: false, desc: 'Collect ₹25,000 from every other player now.' },
+    RIGHTS: { name: 'Rights Offer', icon: '🎟', target: true, own: true, desc: 'Buy 1 extra share for every 2 you own, at half price, right now.' },
+    SCAM: { name: 'Scam Exposed', icon: '🚨', target: true, desc: 'Company crashes −₹40 at the reveal.' },
+    FREEZE: { name: 'Trading Freeze', icon: '🔒', target: true, desc: 'Company does not move at all this round.' },
+    RUPUP: { name: 'Rupee Rocket', icon: '🚀', target: false, desc: 'Every company rises 10% at the reveal.' },
+    RUPDN: { name: 'Rupee Slide', icon: '📉', target: false, desc: 'Every company falls 10% at the reveal.' },
+    UPCAP: { name: 'Upper Limit', icon: '🚧', target: true, desc: 'Company can rise at most +₹15 this round.' },
+    LOWCAP: { name: 'Lower Limit', icon: '🪂', target: true, desc: 'Company can fall at most −₹15 this round.' },
+    DIVIDEND: { name: 'Dividend Day', icon: '💰', target: true, desc: 'Every holder gets ₹5 per share at the reveal.' },
+    SPY: { name: 'Spy Glass', icon: '🔍', target: false, desc: 'Secretly see one rival\'s whole hand.' },
   };
 
   BR.RULES = {
@@ -51,8 +51,9 @@
     specialChance: 0.75,  // chance of a special card in your hand each round
     splitAt: 250,         // price where a 1:1 bonus kicks in
     dividend: 5,
-    giftMax: 5000,
-    lootEach: 25000,
+    supply: 100000,       // shares of each company on the table
+    rightsMax: 5000,      // most rights shares one card can give
+    bossMin: 5000,        // shares needed to become a company's Big Boss
     loanStep: 100000,
     loanMax: 300000,
     loanRate: 0.1,        // per round

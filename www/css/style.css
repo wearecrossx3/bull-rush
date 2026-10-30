@@ -249,3 +249,48 @@ input { background: #fffdf7; color: #4a2c12; border: 2px solid #e2c697; }
 .seat .w { white-space: nowrap; }
 .seat { grid-template-columns: 26px 1fr auto; padding: 2px 6px; }
 .seat .av { width: 26px; height: 26px; font-size: 15px; }
+
+/* ---------- v3: dashboard, boss, spy ---------- */
+.t-boss { position: absolute; left: 6px; bottom: 5px; font-size: 11px; font-weight: 900; background: #fff6e4; border-radius: 999px; padding: 0 5px; box-shadow: 0 2px 0 rgba(74,44,18,.3); }
+.t-bars { margin-left: 30px; margin-right: 34px; }
+.dash-wrap { overflow: auto; max-height: 62vh; }
+.dash { border-collapse: separate; border-spacing: 3px; font-size: 12px; width: 100%; text-align: center; }
+.dash th { font-size: 10px; color: #7a5530; font-weight: 800; }
+.dash th small { color: #9a7650; font-weight: 700; }
+.dash .dlg { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: #0b1020; font-size: 12px; }
+.dash td { background: #fbe9c9; border-radius: 8px; padding: 5px 4px; font-weight: 800; color: #b9976a; white-space: nowrap; }
+.dash td.has { background: #ffe17a; color: #4a2c12; }
+.dash td.money { background: transparent; color: #4a2c12; font-size: 11px; }
+.dash th.pn { text-align: left; font-size: 12px; color: #4a2c12; white-space: nowrap; }
+.dash tr.me th.pn { color: #c27400; }
+.dash tr.left td { background: transparent; color: #9a7650; font-size: 10px; }
+.spy-hand { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0; }
+.card.mini { margin: 0; transform: none !important; animation: none; }
+.act-tip { font-size: 12px; line-height: 1.5; }
+
+/* ---------- portrait phones ---------- */
+@media (orientation: portrait) {
+  .title-wrap { flex-direction: column; gap: 24px; }
+  .setup-grid, .online-cols, .m-grid { grid-template-columns: 1fr; }
+  .howto-body { columns: 1; }
+  .lobby-list { grid-template-columns: 1fr 1fr; }
+  .topbar { flex-wrap: wrap; height: auto; padding: 6px 8px; row-gap: 4px; }
+  .tb-logo, .topbar .lbl { display: none; }
+  .tb-turn { order: 10; flex-basis: 100%; }
+  .tb-turn.mine { flex-basis: auto; }
+  .table { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 6px 6px 0; gap: 6px; }
+  .seats-col { display: contents; }
+  .seats { order: -1; flex-direction: row; overflow-x: auto; overflow-y: hidden; flex: none; }
+  .seat { min-width: 132px; }
+  .board { grid-template-columns: repeat(3, 1fr) !important; padding: 6px; gap: 6px; }
+  .t-price { font-size: 20px; }
+  .actbox { flex-direction: row; align-items: center; }
+  .actbox .btn { width: auto; flex: none; }
+  .actbox .act-tip { flex: 1; }
+  .feed-mini { flex: 1; max-height: 40px; }
+  .hand { height: 96px; overflow-x: auto; justify-content: flex-start; padding-left: 14px; }
+  .card { flex: none; }
+  .rev-row { grid-template-columns: 24px 54px 1fr 40px; }
+  .rev-px { grid-column: 2 / -1; text-align: left; }
+  .modal-card { padding: 12px; }
+}

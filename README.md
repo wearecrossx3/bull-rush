@@ -10,11 +10,13 @@ All companies, events, cards and artwork in this game are original and fictional
 - Take turns around the table: buy or sell blocks of 1,000 shares, apply for an IPO, play a gold card, or pass
 - Big reveal at the end of each round: all cards flip and each company moves by its total
 - Bankruptcy at ₹0 wipes shares; a 1:1 bonus at ₹250 doubles them
-- Gold cards: Bull Run, Bear Attack, Safe Shield, Double Trouble, Dividend Day, Bonus Gift, Monsoon Boom, Market Crash, Broker Fees
+- Gold cards: Rights Offer, Scam Exposed, Trading Freeze, Rupee Rocket, Rupee Slide, Upper Limit, Lower Limit, Dividend Day, Spy Glass
+- Big Boss: the biggest holder of a company blocks its worst card; each company has 1,00,000 shares on the table
+- Shares dashboard showing who owns what
 - IPOs mid-game with fair-share allotment, and a bank for ₹1 lakh loans
 - 1 to 5 bots with three skill levels; auto-save every round
 - Online rooms for up to 6 players (PeerJS, host runs the game)
-- Cosy wooden-table cartoon look, landscape only
+- Cosy wooden-table cartoon look, works in portrait and landscape
 
 ## Layout
 
