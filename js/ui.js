@@ -347,7 +347,7 @@
 
   // ---------------------------------------------------------------- table
   function renderTop(v, me) {
-    $('#tb-day').textContent = `${v.round}/${v.settings.rounds}`;
+    $('#tb-day').textContent = v.settings.rounds ? `${v.round}/${v.settings.rounds}` : `${v.round}/∞`;
     const t = $('#tb-turn');
     const cur = v.players[v.seat];
     if (v.phase === 'turns') {
@@ -372,7 +372,7 @@
   function renderBoard(v, me) {
     const el = $('#board');
     const list = v.companies;
-    el.style.setProperty('--cols', Math.ceil(list.length / 2));
+    el.style.setProperty('--cols', Math.ceil(list.length / (list.length > 10 ? 3 : 2)));
     el.dataset.n = list.length;
     const playsOn = {};
     for (const x of v.plays) if (x.tk) (playsOn[x.tk] = playsOn[x.tk] || []).push(BR.SPECIALS[x.sp].icon);
@@ -678,6 +678,15 @@
     else if (k.startsWith('lf:')) { UI.logFilter = k.slice(3); logModal(v, me); }
     else if (k.startsWith('co:')) { const c = U.company(v, k.slice(3)); if (c.status === 'ipo') ipoModal(v, me); else tradeModal(v, me, c.tk); }
     else if (k === 'skip') finishReveal(v, me, true);
+    else if (k.startsWith('ext:')) {
+      const by = +k.slice(4);
+      const wasEnded = v.phase === 'ended';
+      if (send({ type: 'extend', by })) {
+        BR.sfx('bonus'); closeModal(true); UI.statsSaved = false;
+        banner(`➕ ${by} more round${by > 1 ? 's' : ''}!`, 'gold');
+        if (wasEnded) UI.phaseKey = '';
+      }
+    } else if (k === 'endgame') { if (send({ type: 'endgame' })) { closeModal(true); banner('🏁 Final round!', 'gold'); } }
     else if (k.startsWith('pref:')) { const [, key, val] = k.split(':'); const p = prefs(); p[key] = val === 'true' ? true : val === 'false' ? false : val; store.set('br.prefs', p); applyPrefs(); settingsModal(); }
     else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); }
     else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); statsModal(); renderHome(); }
@@ -1000,17 +1009,22 @@
       <div class="m-grid"><div class="m-box"><h3>YOUR RESULT</h3><div class="macro-big">${rs(mine.worth)} <span class="${cls(Math.round(gain))}">(${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%)</span></div>
       <div class="hint">Best ever: ${rs(Math.max(best, mine.worth))}</div></div>
       <div class="m-box"><h3>WEALTH RACE</h3><canvas id="race2" style="width:100%;height:70px"></canvas></div></div>
-      <div class="m-foot"><button class="btn" data-m="quit">Main menu</button>${UI.ctrl.online ? '' : '<button class="btn gold big" data-m="again">Play again</button>'}</div>`);
+      <div class="m-foot"><button class="btn" data-m="quit">Main menu</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ Keep playing (+5 rounds)</button>' : ''}${UI.ctrl.online ? '' : '<button class="btn gold big" data-m="again">Play again</button>'}</div>`);
     setTimeout(() => {
       const cv = $('#race2');
       if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth })));
     }, 50);
   }
 
+  const isHost = (v) => !!v && v.players[0].id === UI.ctrl.me;
   function menuModal() {
-    openModal('menu', `<h2>☰ Menu<button class="x" data-m="close">✕</button></h2>
+    const v = view();
+    const host = isHost(v) && v.phase !== 'ended';
+    const left = v && v.settings.rounds ? `Round ${v.round} of ${v.settings.rounds}` : v ? `Round ${v.round} · no limit` : '';
+    openModal('menu', `<h2>☰ Menu<small>${left}</small><button class="x" data-m="close">✕</button></h2>
       <div class="menu-list">
         <button class="btn gold" data-m="close">▶ Resume</button>
+        ${host ? `<div class="row">${v.settings.rounds ? '<button class="btn" data-m="ext:1">➕ 1 round</button><button class="btn" data-m="ext:5">➕ 5 rounds</button>' : ''}${!v.settings.rounds || v.settings.rounds > v.round ? '<button class="btn" data-m="endgame">🏁 Last round now</button>' : ''}</div>` : ''}
         <button class="btn" data-m="howto">📘 How to play</button>
         <button class="btn" data-m="sound">${BR.sound.on ? '🔊 Sound on' : '🔇 Sound off'}</button>
         <button class="btn red" data-m="quit">Quit to main menu${UI.ctrl && !UI.ctrl.online ? ' (saved every round)' : ''}</button>
@@ -1064,6 +1078,7 @@
     <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
     <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
     <h4>🏢 Your own company</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company.</p>
+    <h4>⏱ Game length</h4><p>Pick 6 to 20 rounds or ∞ (no limit). The host can add rounds or call the last round from the ☰ menu, and can keep playing after the final results.</p>
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>
     <h4>🌐 Online</h4><p>One player hosts a room and shares the 5-letter code. Up to 6 players; bots can fill empty seats.</p>`;
 
