@@ -17,7 +17,7 @@
       const c = U.company(s, t);
       est[t] += rup * c.price * 0.1;
       for (const x of s.plays) {
-        if (x.tk !== t) continue;
+        if (x.tk !== t || (x.secret && x.pid !== p.id)) continue;
         if (x.sp === 'SCAM') est[t] -= 40;
         if (x.sp === 'DIVIDEND') est[t] += 5;
         if (x.sp === 'UPCAP') est[t] = Math.min(est[t], 15);
