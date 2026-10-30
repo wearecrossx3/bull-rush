@@ -1,19 +1,24 @@
 # Bull Rush
 
-An original, landscape stock-market trading game for Android. Trade fictional companies against bots or friends online, chase IPOs, use the bank, and finish with the highest net worth.
+An original stock-market trading game for Android. Trade fictional companies against bots or friends online, chase IPOs, use the bank, and finish with the highest net worth.
 
 All companies, events, cards and artwork in this game are original and fictional.
 
 ## Features
 
-- Turn-based tabletop play: every round each player is dealt secret price cards (like "KAIR +15")
+- Turn-based tabletop play: every round each player is dealt 7 secret price cards (like "KAIR +15"), dealt fairly so every hand has rises and falls
 - Take turns around the table: buy or sell blocks of 1,000 shares, apply for an IPO, play a gold card, or pass
-- Big reveal at the end of each round: all cards flip and each company moves by its total
+- Big reveal at the end of each round: all cards flip one by one and each company moves by its total
 - Bankruptcy at ₹0 wipes shares; a 1:1 bonus at ₹250 doubles them
+- 3 gold cards each at the start, kept until played; players in the bottom half get a catch-up card after every reveal
 - Gold cards: Rights Offer, Scam Exposed, Trading Freeze, Rupee Rocket, Rupee Slide, Upper Limit, Lower Limit, Dividend Day, Spy Glass
-- Big Boss: the biggest holder of a company blocks its worst card; each company has 1,00,000 shares on the table
-- Shares dashboard showing who owns what
-- IPOs mid-game with fair-share allotment, and a bank for ₹1 lakh loans
+- Co-owner (top holder with 20,000+ shares) cancels the worst minus card; Owner (50,000+) cancels the two worst
+- Market brain: expensive stocks lean down, beaten-down stocks lean up, long streaks tire out
+- Bank: credit of ₹2 lakh plus half your shares, 5% interest per round, fixed deposits at 2%, margin calls
+- Every company gets a random logo each game; deed-card tiles show price, chart and top holders
+- Tap any player to see their holdings and latest moves; trade list of every move at the table; shares dashboard
+- Rival moves pop up as bubbles; bots take a realistic moment to think
+- Money-stack animations, round banners, card flips, confetti and synthesised sound effects
 - 1 to 5 bots with three skill levels; auto-save every round
 - Online rooms for up to 6 players (PeerJS, host runs the game)
 - Cosy wooden-table cartoon look, works in portrait and landscape
@@ -28,6 +33,7 @@ www/            the game (plain HTML/CSS/JS, no build step)
   js/net.js     online rooms
   js/ui.js      screens and rendering
 android/        native WebView shell and APK build script
+art/            app icon source (icon.html) and a 512px render
 ```
 
 Play in a browser: open `www/index.html`.
@@ -41,7 +47,7 @@ Play in a browser: open `www/index.html`.
 - `apksig.jar` (`com.android.tools.build:apksig:2.3.0`)
 
 ```
-BR_KEYSTORE=/path/to/bullrush.p12 BR_VERSION_CODE=2 BR_VERSION_NAME=1.1 python3 android/build.py
+BR_KEYSTORE=/path/to/bullrush.p12 BR_VERSION_CODE=4 BR_VERSION_NAME=4.0 python3 android/build.py
 ```
 
 Keep the same keystore for every release, otherwise Android refuses to install an update over the old version. The keystore is not committed.

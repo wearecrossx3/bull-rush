@@ -13,23 +13,28 @@
     ENER: { name: 'Energy', color: '#ff5c8a' },
   };
 
-  // start: opening price on the board (₹ per share). Shares trade in blocks of 1,000.
-  BR.COMPANIES = [
-    { tk: 'ZENV', name: 'Zenvolt Power', sector: 'ENER', start: 20, logo: '⚡' },
-    { tk: 'BRIK', name: 'Brickstone Infra', sector: 'INFRA', start: 30, logo: '▦' },
-    { tk: 'ORBT', name: 'Orbit Telecom', sector: 'TEL', start: 40, logo: '◎' },
-    { tk: 'LUMN', name: 'Lumen Pharma', sector: 'PHAR', start: 55, logo: '✚' },
-    { tk: 'MERI', name: 'Meridian Bank', sector: 'BANK', start: 65, logo: '◆' },
-    { tk: 'KAIR', name: 'Kairo Motors', sector: 'AUTO', start: 80, logo: '⚙' },
-    { tk: 'SAFF', name: 'Saffron Foods', sector: 'FMCG', start: 90, logo: '❀' },
-    { tk: 'NMBS', name: 'NimbusSoft', sector: 'IT', start: 100, logo: '☁' },
+  // Pool of fictional companies; each game picks 8 for the board and 3 more for IPOs,
+  // and gives every one a random logo.
+  BR.COMPANY_POOL = [
+    { tk: 'ZENV', name: 'Zenvolt Power', sector: 'ENER', pitch: 'Solar farms on every rooftop' },
+    { tk: 'BRIK', name: 'Brickstone Infra', sector: 'INFRA', pitch: 'Bridges, metros and highways' },
+    { tk: 'ORBT', name: 'Orbit Telecom', sector: 'TEL', pitch: '5G towers in every village' },
+    { tk: 'LUMN', name: 'Lumen Pharma', sector: 'PHAR', pitch: 'Low-cost medicines for the world' },
+    { tk: 'MERI', name: 'Meridian Bank', sector: 'BANK', pitch: 'Loans for small businesses' },
+    { tk: 'KAIR', name: 'Kairo Motors', sector: 'AUTO', pitch: 'Family cars and tractors' },
+    { tk: 'SAFF', name: 'Saffron Foods', sector: 'FMCG', pitch: 'Snacks, tea and spices' },
+    { tk: 'NMBS', name: 'NimbusSoft', sector: 'IT', pitch: 'Cloud software for banks' },
+    { tk: 'IRON', name: 'Ironpeak Steel', sector: 'METAL', pitch: 'Steel for a growing country' },
+    { tk: 'SKYL', name: 'Skyline Air', sector: 'AIR', pitch: 'Cheap flights to small cities' },
+    { tk: 'TALA', name: 'Tala Textiles', sector: 'FMCG', pitch: 'Cotton from farm to fashion' },
+    { tk: 'VYOM', name: 'Vyom Space', sector: 'TEL', pitch: 'Tiny satellites, big dreams' },
+    { tk: 'QNTC', name: 'QuantaChip', sector: 'METAL', pitch: 'India\'s first fabless chip designer' },
+    { tk: 'GLEV', name: 'GreenLeaf EV', sector: 'AIR', pitch: 'Electric scooters for small towns' },
+    { tk: 'PAYW', name: 'Paywave', sector: 'BANK', pitch: 'UPI payments for 40 lakh shops' },
+    { tk: 'NOVA', name: 'NovaCure Health', sector: 'PHAR', pitch: 'Hospitals across tier-2 cities' },
   ];
-
-  BR.IPOS = [
-    { tk: 'QNTC', name: 'QuantaChip', sector: 'METAL', start: 50, logo: '◈', pitch: 'India\'s first fabless chip designer' },
-    { tk: 'GLEV', name: 'GreenLeaf EV', sector: 'AIR', start: 30, logo: '❦', pitch: 'Electric scooters for small towns' },
-    { tk: 'PAYW', name: 'Paywave', sector: 'BANK', start: 45, logo: '₹', pitch: 'UPI payments for 40 lakh shops' },
-  ];
+  BR.START_PRICES = [20, 30, 40, 55, 65, 80, 90, 100];
+  BR.IPO_PRICES = [30, 45, 50];
 
   // Special (gold) cards: playing one uses your turn. target = needs a company.
   BR.SPECIALS = {
@@ -48,15 +53,21 @@
     startCash: 500000,
     block: 1000,          // shares per block
     priceCards: 7,        // price cards per player per round
-    specialChance: 0.75,  // chance of a special card in your hand each round
+    startGold: 3,         // gold cards everyone starts with (kept between rounds)
+    maxGold: 5,
     splitAt: 250,         // price where a 1:1 bonus kicks in
     dividend: 5,
     supply: 100000,       // shares of each company on the table
     rightsMax: 5000,      // most rights shares one card can give
-    bossMin: 5000,        // shares needed to become a company's Big Boss
+    coOwnerAt: 20000,     // top holder with this many shares blocks the worst minus card
+    ownerAt: 50000,       // ...and with this many, the two worst
+    baseCredit: 200000,   // the bank lends this much on trust
+    loanLtv: 0.5,         // plus half the value of your shares and deposits
     loanStep: 100000,
-    loanMax: 300000,
-    loanRate: 0.1,        // per round
+    loanRate: 0.05,       // per round
+    fdRate: 0.02,         // per round
+    marginAt: 0.7,        // loan above 70% of everything you own -> bank sells your shares
     ipoMaxBlocks: 5,
+    botThink: [1.8, 3.6], // seconds a bot "thinks" before acting
   };
 })(window.BR = window.BR || {});

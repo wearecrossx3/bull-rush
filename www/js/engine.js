@@ -1,4 +1,4 @@
-// Bull Rush engine (tabletop edition): turn-based rounds, dealt price cards and a big reveal.
+// Bull Rush engine (tabletop edition): turn-based rounds, dealt price cards, gold cards and a big reveal.
 // Pure state + actions so the same code runs offline and on the online host.
 (function (BR) {
   const R = BR.RULES;
@@ -13,40 +13,54 @@
   }
   const pick = (s, arr) => arr[Math.floor(rnd(s) * arr.length)];
   const shuffle = (s, arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd(s) * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const company = (s, tk) => s.companies.find((c) => c.tk === tk);
   const player = (s, id) => s.players.find((p) => p.id === id);
   const current = (s) => s.players[s.seat];
+  const live = (c) => c.status === 'active';
 
-  function log(s, text, kind) {
-    s.feed.unshift({ round: s.round, text, kind: kind || 'news' });
-    if (s.feed.length > 60) s.feed.length = 60;
-  }
-
-  function holdingsValue(s, p) {
-    let v = 0;
-    for (const tk in p.hold) { const c = company(s, tk); if (c) v += p.hold[tk] * (c.status === 'ipo' ? c.issue : c.price); }
-    return v;
-  }
-  function netWorth(s, p) { return p.cash + holdingsValue(s, p) + (p.ipoBlocked || 0) - p.loan; }
   function fmt(n) {
     const a = Math.abs(n);
     if (a >= 1e7) return (n / 1e7).toFixed(2) + ' Cr';
     if (a >= 1e5) return (n / 1e5).toFixed(2) + ' L';
     return Math.round(n).toLocaleString('en-IN');
   }
-  // The player holding the most shares of a company (at least bossMin, no tie) is its Big Boss.
-  function bossOf(s, c) {
+  function log(s, text, kind) {
+    s.feed.unshift({ round: s.round, text, kind: kind || 'news' });
+    if (s.feed.length > 80) s.feed.length = 80;
+  }
+  // Public record of every money move, shown in the trade list.
+  function trade(s, p, act, tk, qty, px, note) {
+    s.trades.unshift({ r: s.round, who: p.name, avatar: p.avatar, pid: p.id, act, tk, qty, px, note: note || '' });
+    if (s.trades.length > 250) s.trades.length = 250;
+    p.lastAct = { r: s.round, act, tk, qty, px, note: note || '' };
+  }
+
+  function priceOf(c) { return c.status === 'ipo' ? c.issue : c.price; }
+  function holdingsValue(s, p) {
+    let v = 0;
+    for (const tk in p.hold) { const c = company(s, tk); if (c) v += p.hold[tk] * priceOf(c); }
+    return v;
+  }
+  function netWorth(s, p) { return p.cash + p.fd + holdingsValue(s, p) + (p.ipoBlocked || 0) - p.loan; }
+  function loanLimit(s, p) { return Math.max(0, Math.floor((R.baseCredit + R.loanLtv * (holdingsValue(s, p) + p.fd) - p.loan) / 10000) * 10000); }
+  function available(s, c) { return (c.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
+  function maxBlocks(s, p, c) {
+    if (!live(c)) return 0;
+    return Math.max(0, Math.min(Math.floor(p.cash / (c.price * R.block)), Math.floor(available(s, c) / R.block)));
+  }
+
+  // Top holder of a company earns a title: Co-owner (blocks 1 minus card) or Owner (blocks 2).
+  function ownerOf(s, c) {
     let best = null, tie = false;
     for (const p of s.players) {
       const q = p.hold[c.tk] || 0;
-      if (q < R.bossMin) continue;
+      if (q < R.coOwnerAt) continue;
       if (!best || q > best.hold[c.tk]) { best = p; tie = false; } else if (q === best.hold[c.tk]) tie = true;
     }
-    return tie ? null : best;
+    if (!best || tie) return null;
+    return { p: best, rank: best.hold[c.tk] >= R.ownerAt ? 'owner' : 'co', blocks: best.hold[c.tk] >= R.ownerAt ? 2 : 1 };
   }
-  // Each company has a limited pile of shares; what players hold is gone from the pile.
-  function available(s, c) { return (c.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
-  function maxBlocks(s, p, c) { return c.status === 'active' ? Math.max(0, Math.min(Math.floor(p.cash / (c.price * R.block)), Math.floor(available(s, c) / R.block))) : 0; }
 
   function tier(c) {
     if (c.price < 20) return [5];
@@ -56,12 +70,17 @@
     return [10, 20, 25, 30];
   }
 
-  function newCompany(def) {
+  const SHAPES = ['circle', 'hex', 'diamond', 'shield', 'square', 'star', 'drop', 'leaf'];
+  const PALETTE = ['#ff5c8a', '#ff8a3d', '#ffd23f', '#7ed957', '#2fd0c6', '#5fd3ff', '#5b8cff', '#b46cff', '#f06bd8', '#c9a36b', '#3ddc97', '#ff6f59'];
+  function newCompany(s, def, idx) {
+    const words = def.name.split(/\s+/);
     return {
-      tk: def.tk, name: def.name, sector: def.sector, logo: def.logo, color: BR.SECTORS[def.sector].color,
-      price: def.start, start: def.start, history: [def.start], last: 0, status: 'active',
+      tk: def.tk, name: def.name, sector: def.sector, pitch: def.pitch, color: s.palette[idx % s.palette.length],
+      mark: { shape: pick(s, SHAPES), letters: (words[0][0] + (words[1] ? words[1][0] : words[0][1])).toUpperCase(), tilt: Math.floor(rnd(s) * 4), ring: rnd(s) < 0.5 },
+      price: def.start, start: def.start, history: [def.start], last: 0, status: 'active', supply: R.supply,
     };
   }
+  function goldCard(s, p) { return { id: 'g' + Math.floor(rnd(s) * 1e9), sp: pick(s, Object.keys(BR.SPECIALS)) }; }
 
   // ---------------------------------------------------------------- setup
   BR.createGame = function (settings, roster) {
@@ -70,9 +89,12 @@
       settings: Object.assign({ rounds: 8, turns: 3, startCash: R.startCash, auto: false, turnTime: 0 }, settings),
       round: 0, pass: 0, seat: 0, phase: 'turns', timeLeft: 0, botWait: 0,
       rng: (settings.seed || Date.now()) | 0,
-      companies: BR.COMPANIES.map(newCompany), players: [], feed: [], plays: [], reveal: null, ipo: null,
+      companies: [], players: [], feed: [], trades: [], plays: [], reveal: null, ipo: null,
     };
-    s.ipoQueue = shuffle(s, BR.IPOS.map((_, i) => i));
+    const pool = shuffle(s, BR.COMPANY_POOL.slice());
+    s.palette = shuffle(s, PALETTE.slice());
+    s.companies = BR.START_PRICES.map((start, i) => newCompany(s, Object.assign({ start }, pool[i]), i));
+    s.ipoDefs = BR.IPO_PRICES.map((start, i) => Object.assign({ start }, pool[8 + i]));
     s.ipoRounds = [];
     for (const f of [0.3, 0.55, 0.8]) {
       const r = Math.max(2, Math.round(s.settings.rounds * f));
@@ -80,14 +102,54 @@
     }
     s.players = roster.map((r, i) => ({
       id: r.id, name: r.name, bot: r.bot || null, color: r.color || BR.COLORS[i % 6], avatar: r.avatar || BR.AVATARS[i],
-      cash: s.settings.startCash, hold: {}, loan: 0, hand: [], ipoBlocks: 0, ipoBlocked: 0,
-      ready: false, connected: true, worth: [s.settings.startCash], seat: i,
+      cash: s.settings.startCash, hold: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
+      ready: false, connected: true, worth: [s.settings.startCash], seat: i, lastAct: null, spy: null,
     }));
+    for (const p of s.players) for (let i = 0; i < R.startGold; i++) p.gold.push(goldCard(s, p));
     s.dealer = Math.floor(rnd(s) * s.players.length);
-    log(s, 'Welcome to the Bull Rush table! Cards are being dealt.', 'sys');
+    log(s, 'Welcome to the Bull Rush table! Everyone gets 3 gold cards.', 'sys');
     startRound(s);
     return s;
   };
+
+  // ---------------------------------------------------------------- market brain
+  // Decides how many rise/fall cards each company gets so no stock runs away for ever:
+  // expensive stocks lean down, beaten-down stocks lean up, and long streaks get tired.
+  function buildDeck(s, cos, total) {
+    const deck = [];
+    for (let i = 0; i < total; i++) {
+      const c = cos[i % cos.length];
+      const ratio = c.price / c.start;
+      let bias = clamp(-0.28 * Math.log(ratio) / Math.log(2), -0.3, 0.3);
+      const h = c.history;
+      if (h.length >= 3) {
+        const up = h[h.length - 1] > h[h.length - 2] && h[h.length - 2] > h[h.length - 3];
+        const down = h[h.length - 1] < h[h.length - 2] && h[h.length - 2] < h[h.length - 3];
+        if (up) bias -= 0.12;
+        if (down) bias += 0.12;
+      }
+      const v = pick(s, tier(c)) * (rnd(s) < 0.5 + bias ? 1 : -1);
+      deck.push({ id: 'k' + s.round + '-' + i, tk: c.tk, v });
+    }
+    return shuffle(s, deck);
+  }
+
+  // Every hand gets a fair mix of rises and falls.
+  function dealFair(s, deck, n, each) {
+    const ups = deck.filter((k) => k.v > 0), downs = deck.filter((k) => k.v < 0);
+    const hands = [];
+    for (let i = 0; i < n; i++) {
+      const h = [];
+      const wantUp = Math.round(each / 2 + (rnd(s) - 0.5) * 2);
+      for (let j = 0; j < each; j++) {
+        const fromUp = (j < wantUp && ups.length) || !downs.length;
+        const k = (fromUp ? ups : downs).pop();
+        if (k) h.push(k);
+      }
+      hands.push(h.sort((a, b) => a.tk.localeCompare(b.tk) || b.v - a.v));
+    }
+    return { hands, rest: ups.concat(downs) };
+  }
 
   // ---------------------------------------------------------------- rounds
   function startRound(s) {
@@ -104,43 +166,32 @@
       }
     }
 
-    // IPO: a new company joins, only buyable through the IPO this round
     s.ipo = null;
-    if (s.ipoRounds.includes(s.round) && s.ipoQueue.length) {
-      const def = BR.IPOS[s.ipoQueue.shift()];
-      const c = newCompany(def);
+    if (s.ipoRounds.includes(s.round) && s.ipoDefs.length) {
+      const def = s.ipoDefs.shift();
+      const c = newCompany(s, def, s.companies.length);
       c.status = 'ipo'; c.issue = def.start; c.history = [];
       s.companies.push(c);
-      s.ipo = { tk: c.tk, name: c.name, issue: def.start, blocks: Math.max(4, s.players.length * 3), pitch: def.pitch };
+      s.ipo = { tk: c.tk, name: c.name, issue: def.start, blocks: Math.max(6, s.players.length * 4), pitch: def.pitch };
       log(s, `🚀 IPO! ${c.name} opens at ₹${def.start}/share. Apply on your turn this round.`, 'ipo');
     }
 
-    // deal hands
-    const live = s.companies.filter((c) => c.status === 'active' || c.status === 'ipo');
-    const deck = [];
+    const cos = s.companies.filter((c) => c.status === 'active' || c.status === 'ipo');
     const n = s.players.length;
-    const cardsEach = R.priceCards;
-    const total = cardsEach * n + Math.max(0, 32 - cardsEach * n); // extra "market" cards keep small tables lively
-    for (let i = 0; i < total; i++) {
-      const c = live[i % live.length];
-      const v = pick(s, tier(c)) * (rnd(s) < 0.5 ? 1 : -1);
-      deck.push({ id: 'k' + s.round + '-' + i, kind: 'price', tk: c.tk, v });
-    }
-    shuffle(s, deck);
-    const specials = Object.keys(BR.SPECIALS);
-    for (const p of s.players) {
-      p.hand = deck.splice(0, cardsEach);
-      if (rnd(s) < R.specialChance) p.hand.push({ id: 'x' + s.round + p.seat, kind: 'special', sp: pick(s, specials) });
-      p.hand.sort((a, b) => (a.kind === b.kind ? (a.tk || '').localeCompare(b.tk || '') : a.kind === 'special' ? 1 : -1));
+    const each = R.priceCards;
+    const total = each * n + Math.max(0, 32 - each * n);
+    const { hands, rest } = dealFair(s, buildDeck(s, cos, total), n, each);
+    s.players.forEach((p, i) => {
+      p.hand = hands[i];
       p.ipoBlocks = 0;
       p.spy = null;
       p.ready = !!p.bot;
-    }
-    s.market = deck; // leftover cards nobody holds
+    });
+    s.market = rest;
     s.dealer = (s.dealer + 1) % n;
     s.seat = s.dealer;
     s.timeLeft = s.settings.turnTime;
-    s.botWait = 1.2;
+    s.botWait = R.botThink[0] + 1;
     log(s, `Round ${s.round}: cards dealt. ${current(s).name} starts.`, 'sys');
     s.v++;
   }
@@ -152,7 +203,7 @@
       if (s.pass >= s.settings.turns) { doReveal(s); return; }
     }
     s.timeLeft = s.settings.turnTime;
-    s.botWait = 0.9 + rnd(s) * 0.8;
+    s.botWait = R.botThink[0] + rnd(s) * (R.botThink[1] - R.botThink[0]);
     s.v++;
   }
 
@@ -160,9 +211,9 @@
     const rows = [];
     const events = [];
     const before = {};
-    for (const p of s.players) before[p.id] = netWorth(s, p);
+    const cashBefore = {};
+    for (const p of s.players) { before[p.id] = netWorth(s, p); cashBefore[p.id] = p.cash; }
 
-    // IPO allotment happens before the listing price moves
     if (s.ipo) {
       const c = company(s, s.ipo.tk);
       const want = s.players.reduce((a, p) => a + p.ipoBlocks, 0);
@@ -175,25 +226,25 @@
         p.cash += p.ipoBlocked - shares * c.issue;
         p.ipoBlocked = 0;
         if (shares) p.hold[c.tk] = (p.hold[c.tk] || 0) + shares;
-        events.push(`${p.name} got ${got} of ${p.ipoBlocks} IPO blocks in ${c.tk}.`);
+        events.push(`${p.avatar} ${p.name} got ${got} of ${p.ipoBlocks} IPO blocks in ${c.tk}.`);
+        trade(s, p, 'ipo', c.tk, shares, c.issue, `allotted ${got}/${p.ipoBlocks}`);
       }
       if (want > s.ipo.blocks) events.push(`${c.name} IPO was oversubscribed ${(want / s.ipo.blocks).toFixed(1)}x!`);
-      c.status = 'active';
-      c.price = c.issue;
-      c.history = [c.issue];
+      c.status = 'active'; c.price = c.issue; c.history = [c.issue];
     }
 
     const rupee = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
     for (const c of s.companies) {
-      if (c.status !== 'active') continue;
+      if (!live(c)) continue;
       const cards = [];
-      for (const p of s.players) for (const k of p.hand) if (k.kind === 'price' && k.tk === c.tk) cards.push({ who: p.name, v: k.v, avatar: p.avatar });
+      for (const p of s.players) for (const k of p.hand) if (k.tk === c.tk) cards.push({ who: p.name, v: k.v, avatar: p.avatar });
       for (const k of s.market) if (k.tk === c.tk) cards.push({ who: 'Market', v: k.v, avatar: '🏛' });
       const mods = [];
-      const boss = bossOf(s, c);
-      if (boss) {
-        const worst = cards.filter((k) => k.v < 0).sort((a, b) => a.v - b.v)[0];
-        if (worst) { worst.blocked = true; mods.push(`👑 ${boss.name} blocked ${worst.v}`); }
+      const own = ownerOf(s, c);
+      if (own) {
+        const worst = cards.filter((k) => k.v < 0).sort((a, b) => a.v - b.v).slice(0, own.blocks);
+        worst.forEach((k) => (k.blocked = true));
+        if (worst.length) mods.push(`${own.rank === 'owner' ? '👑 Owner' : '🎩 Co-owner'} ${own.p.name} removed ${worst.map((k) => k.v).join(', ')}`);
       }
       let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v), 0);
       const on = (sp) => s.plays.some((x) => x.sp === sp && x.tk === c.tk);
@@ -204,11 +255,10 @@
       if (on('FREEZE')) { total = 0; mods.push('🔒 frozen'); }
       const from = c.price;
       let to = Math.max(0, from + total);
-      const row = { tk: c.tk, name: c.name, logo: c.logo, color: c.color, from, to, total, cards, mods, note: '' };
+      const row = { tk: c.tk, name: c.name, color: c.color, mark: c.mark, from, to, total, cards, mods, note: '' };
 
-      for (const x of s.plays) {
-        if (x.sp !== 'DIVIDEND' || x.tk !== c.tk) continue;
-        for (const p of s.players) if (p.hold[c.tk]) p.cash += p.hold[c.tk] * R.dividend;
+      if (on('DIVIDEND')) {
+        for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * R.dividend; trade(s, p, 'div', c.tk, p.hold[c.tk], R.dividend); }
         row.note = `💰 Dividend ₹${R.dividend}/share paid`;
       }
       if (to <= 0) {
@@ -230,27 +280,33 @@
       rows.push(row);
     }
 
-    // bank interest
+    // bank: deposits earn, loans cost, and too much debt triggers a margin call
     for (const p of s.players) {
-      if (p.loan > 0) {
-        const i = Math.round(p.loan * R.loanRate);
-        p.loan += i;
-        events.push(`${p.name} paid ₹${fmt(i)} loan interest.`);
-      }
+      if (p.fd > 0) { const i = Math.round(p.fd * R.fdRate); p.fd += i; }
+      if (p.loan > 0) { const i = Math.round(p.loan * R.loanRate); p.loan += i; }
+      marginCall(s, p, events);
     }
 
-    const pl = {};
+    // catch-up: players in the bottom half get a fresh gold card
+    const ranked = s.players.map((p) => ({ p, w: netWorth(s, p) })).sort((a, b) => b.w - a.w);
+    ranked.slice(Math.ceil(ranked.length / 2)).forEach(({ p }) => {
+      if (p.gold.length < R.maxGold) { p.gold.push(goldCard(s, p)); events.push(`✨ ${p.avatar} ${p.name} gets a bonus gold card for catching up.`); }
+    });
+
+    const pl = {}, cash = {};
     for (const p of s.players) {
       const w = netWorth(s, p);
       p.worth.push(w);
       pl[p.id] = w - before[p.id];
+      cash[p.id] = p.cash - cashBefore[p.id];
     }
     rows.sort((a, b) => b.total - a.total);
-    s.reveal = { round: s.round, rows, events, pl, plays: s.plays.slice() };
+    s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice() };
     log(s, `Round ${s.round} revealed! Biggest mover: ${rows[0] ? rows[0].name : '-'}.`, 'sys');
 
     if (s.round >= s.settings.rounds) {
       s.phase = 'ended';
+      for (const p of s.players) { p.cash += p.fd - p.loan; p.fd = 0; p.loan = 0; }
       s.final = s.players.map((p) => ({ id: p.id, name: p.name, worth: netWorth(s, p), avatar: p.avatar, color: p.color, bot: p.bot }))
         .sort((a, b) => b.worth - a.worth);
     } else {
@@ -261,50 +317,73 @@
     s.v++;
   }
 
+  function marginCall(s, p, events) {
+    // the bank tolerates its trust credit plus 70% of what you own; beyond that it recovers the loan
+    const assets = p.cash + p.fd + holdingsValue(s, p);
+    if (p.loan <= 0 || p.loan <= R.baseCredit + assets * R.marginAt) return;
+    const fromCash = Math.min(p.cash, p.loan); p.cash -= fromCash; p.loan -= fromCash;
+    const fromFd = Math.min(p.fd, p.loan); p.fd -= fromFd; p.loan -= fromFd;
+    const held = Object.keys(p.hold).map((tk) => company(s, tk)).filter(live).sort((a, b) => p.hold[b.tk] * b.price - p.hold[a.tk] * a.price);
+    for (const c of held) {
+      if (p.loan <= 0) break;
+      const q = Math.min(p.hold[c.tk], Math.ceil(p.loan / c.price / R.block) * R.block);
+      p.hold[c.tk] -= q;
+      if (!p.hold[c.tk]) delete p.hold[c.tk];
+      const got = q * c.price;
+      const pay = Math.min(got, p.loan);
+      p.loan -= pay; p.cash += got - pay;
+      trade(s, p, 'margin', c.tk, q, c.price, 'bank sold');
+    }
+    events.push(`⚠️ Margin call! The bank sold ${p.name}'s shares to recover its loan.`);
+  }
+
   // ---------------------------------------------------------------- actions
-  // Free actions (bank) can happen any time; turn actions end your turn.
   const ACTIONS = {
     buy(s, p, a) {
       const c = company(s, a.tk);
       const b = Math.floor(a.blocks);
-      if (!c || c.status !== 'active') return 'That company is not trading';
+      if (!c || !live(c)) return 'That company is not trading';
       if (!(b > 0)) return 'Choose how many blocks';
-      const cost = b * R.block * c.price;
-      if (cost > p.cash) return 'Not enough cash';
-      if (b * R.block > available(s, c)) return `Only ${fmt(available(s, c))} ${c.tk} shares left`;
-      p.cash -= cost;
-      p.hold[c.tk] = (p.hold[c.tk] || 0) + b * R.block;
-      log(s, `${p.name} bought ${fmt(b * R.block)} ${c.tk} @ ₹${c.price}`, 'up');
+      const q = b * R.block;
+      if (q * c.price > p.cash) return 'Not enough cash';
+      if (q > available(s, c)) return `Only ${fmt(available(s, c))} ${c.tk} shares left`;
+      p.cash -= q * c.price;
+      p.hold[c.tk] = (p.hold[c.tk] || 0) + q;
+      trade(s, p, 'buy', c.tk, q, c.price);
+      log(s, `${p.avatar} ${p.name} bought ${fmt(q)} ${c.tk} @ ₹${c.price}`, 'up');
       return 'turn';
     },
     sell(s, p, a) {
       const c = company(s, a.tk);
       const b = Math.floor(a.blocks);
-      if (!c || c.status !== 'active') return 'That company is not trading';
-      if (!(b > 0) || b * R.block > (p.hold[c.tk] || 0)) return 'You do not have that many shares';
-      p.cash += b * R.block * c.price;
-      p.hold[c.tk] -= b * R.block;
+      if (!c || !live(c)) return 'That company is not trading';
+      const q = b * R.block;
+      if (!(b > 0) || q > (p.hold[c.tk] || 0)) return 'You do not have that many shares';
+      p.cash += q * c.price;
+      p.hold[c.tk] -= q;
       if (!p.hold[c.tk]) delete p.hold[c.tk];
-      log(s, `${p.name} sold ${fmt(b * R.block)} ${c.tk} @ ₹${c.price}`, 'down');
+      trade(s, p, 'sell', c.tk, q, c.price);
+      log(s, `${p.avatar} ${p.name} sold ${fmt(q)} ${c.tk} @ ₹${c.price}`, 'down');
       return 'turn';
     },
     ipo(s, p, a) {
       if (!s.ipo) return 'No IPO this round';
-      const b = Math.max(1, Math.min(R.ipoMaxBlocks, Math.floor(a.blocks)));
+      const b = clamp(Math.floor(a.blocks), 1, R.ipoMaxBlocks);
       const cost = b * R.block * s.ipo.issue;
       p.cash += p.ipoBlocked;
       if (cost > p.cash) { p.cash -= p.ipoBlocked; return 'Not enough cash'; }
       p.cash -= cost; p.ipoBlocked = cost; p.ipoBlocks = b;
-      log(s, `${p.name} applied for ${b} block${b > 1 ? 's' : ''} of the ${s.ipo.tk} IPO.`, 'ipo');
+      trade(s, p, 'apply', s.ipo.tk, b * R.block, s.ipo.issue, 'IPO application');
+      log(s, `${p.avatar} ${p.name} applied for ${b} block${b > 1 ? 's' : ''} of the ${s.ipo.tk} IPO.`, 'ipo');
       return 'turn';
     },
     special(s, p, a) {
-      const i = p.hand.findIndex((k) => k.id === a.card && k.kind === 'special');
+      const i = p.gold.findIndex((k) => k.id === a.card);
       if (i < 0) return 'You do not have that card';
-      const k = p.hand[i];
+      const k = p.gold[i];
       const def = BR.SPECIALS[k.sp];
       const c = a.tk && company(s, a.tk);
-      if (def.target && (!c || c.status !== 'active')) return 'Pick a company on the board';
+      if (def.target && (!c || !live(c))) return 'Pick a company on the board';
       if (def.own && !p.hold[c.tk]) return 'You must own that company';
       if (k.sp === 'RIGHTS') {
         const half = Math.max(1, Math.round(c.price / 2));
@@ -312,30 +391,47 @@
         add = Math.min(add, Math.floor(p.cash / half / R.block) * R.block, Math.floor(available(s, c) / R.block) * R.block);
         if (!add) return 'Not enough cash for the rights shares';
         p.cash -= add * half; p.hold[c.tk] += add;
-        log(s, `🎟 ${p.name} bought ${fmt(add)} ${c.tk} rights shares at ₹${half}!`, 'up');
+        trade(s, p, 'rights', c.tk, add, half, 'Rights Offer');
       } else if (k.sp === 'SPY') {
         const rivals = s.players.filter((o) => o.id !== p.id);
         const o = rivals[Math.floor(rnd(s) * rivals.length)];
         p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
-        log(s, `🔍 ${p.name} is spying on ${o.name}'s hand!`, 'corp');
+        trade(s, p, 'gold', null, 0, 0, `🔍 spied on ${o.name}`);
       } else {
         s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name });
-        log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
+        trade(s, p, 'gold', c ? c.tk : null, 0, 0, `${def.icon} ${def.name}`);
       }
-      p.hand.splice(i, 1);
+      log(s, `${def.icon} ${p.name} played ${def.name}${c ? ' on ' + c.name : ''}!`, 'corp');
+      p.gold.splice(i, 1);
       return 'turn';
     },
-    pass(s, p) { log(s, `${p.name} passed.`, 'sys'); return 'turn'; },
-    loan(s, p) {
-      if (p.loan + R.loanStep > R.loanMax) return `Loan limit is ₹${fmt(R.loanMax)}`;
-      p.loan += R.loanStep; p.cash += R.loanStep;
-      log(s, `🏦 ${p.name} took a ₹${fmt(R.loanStep)} loan.`, 'sys');
+    pass(s, p) { p.lastAct = { r: s.round, act: 'pass' }; log(s, `${p.avatar} ${p.name} passed.`, 'sys'); return 'turn'; },
+    loan(s, p, a) {
+      const amt = Math.min(Math.floor(a.amt || R.loanStep), loanLimit(s, p));
+      if (!(amt > 0)) return 'The bank will not lend you more right now';
+      p.loan += amt; p.cash += amt;
+      trade(s, p, 'loan', null, 0, amt);
       return null;
     },
-    repay(s, p) {
-      const amt = Math.min(p.loan, p.cash, R.loanStep);
+    repay(s, p, a) {
+      const amt = Math.min(Math.floor(a.amt || R.loanStep), p.loan, p.cash);
       if (!(amt > 0)) return p.loan ? 'Not enough cash' : 'No loan to repay';
       p.loan -= amt; p.cash -= amt;
+      trade(s, p, 'repay', null, 0, amt);
+      return null;
+    },
+    fdIn(s, p, a) {
+      const amt = Math.min(Math.floor(a.amt || R.loanStep), p.cash);
+      if (!(amt > 0)) return 'Not enough cash';
+      p.fd += amt; p.cash -= amt;
+      trade(s, p, 'fd', null, 0, amt, 'deposit');
+      return null;
+    },
+    fdOut(s, p, a) {
+      const amt = Math.min(Math.floor(a.amt || R.loanStep), p.fd);
+      if (!(amt > 0)) return 'No deposit to withdraw';
+      p.fd -= amt; p.cash += amt;
+      trade(s, p, 'fd', null, 0, amt, 'withdraw');
       return null;
     },
     ready(s, p) { p.ready = true; return null; },
@@ -365,11 +461,10 @@
     startRound(s);
   }
 
-  // dt in seconds: turn timers and auto-continue for online games
   BR.tick = function (s, dt) {
     if (s.phase === 'turns' && s.settings.turnTime && !current(s).bot) {
       s.timeLeft -= dt;
-      if (s.timeLeft <= 0) { BR.act(s, current(s).id, { type: 'pass' }); }
+      if (s.timeLeft <= 0) BR.act(s, current(s).id, { type: 'pass' });
       return true;
     }
     if (s.phase === 'reveal' && s.settings.auto && s.timeLeft > 0) {
@@ -383,14 +478,14 @@
   BR.viewFor = function (s, pid) {
     const v = JSON.parse(JSON.stringify(s));
     delete v.rng;
-    v.marketCount = v.market.length;
     v.market = [];
     for (const p of v.players) {
       p.handCount = p.hand.length;
-      if (p.id !== pid) { p.hand = []; p.spy = null; }
+      p.goldCount = p.gold.length;
+      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; }
     }
     return v;
   };
 
-  BR.util = { available, bossOf, netWorth, holdingsValue, maxBlocks, company, player, current, fmt, rnd, pick };
+  BR.util = { available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
 })(window.BR = window.BR || {});

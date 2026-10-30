@@ -11,7 +11,7 @@
   function outlook(s, p, st) {
     const est = {};
     for (const c of s.companies) if (c.status === 'active' || c.status === 'ipo') est[c.tk] = (U.rnd(s) - 0.5) * st.noise;
-    for (const k of p.hand) if (k.kind === 'price' && est[k.tk] !== undefined) est[k.tk] += k.v;
+    for (const k of p.hand) if (est[k.tk] !== undefined) est[k.tk] += k.v;
     const rup = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
     for (const t in est) {
       const c = U.company(s, t);
@@ -25,7 +25,9 @@
         if (x.sp === 'FREEZE') est[t] = 0;
       }
     }
-    if (p.spy) for (const k of p.spy.cards) if (k.kind === 'price' && est[k.tk] !== undefined) est[k.tk] += k.v;
+    if (p.spy) for (const k of p.spy.cards) if (est[k.tk] !== undefined) est[k.tk] += k.v;
+    // owners know their worst minus cards will be blocked
+    for (const t in est) { const o = U.ownerOf(s, U.company(s, t)); if (o && o.p.id === p.id) est[t] += 8 * o.blocks; }
     return est;
   }
 
@@ -41,7 +43,7 @@
     if (bad.length) return { type: 'sell', tk: bad[0], blocks: p.hold[bad[0]] / R.block };
 
     // 2. play a special card when it helps
-    const sp = p.hand.find((k) => k.kind === 'special');
+    const sp = p.gold[0];
     if (sp && U.rnd(s) < st.special) {
       const owned = Object.keys(p.hold).filter((t) => U.company(s, t).status === 'active').sort((a, b) => p.hold[b] - p.hold[a]);
       const notOwned = Object.keys(est).filter((t) => !p.hold[t] && U.company(s, t).status === 'active').sort((a, b) => est[a] - est[b]);
@@ -66,14 +68,15 @@
     const best = Object.keys(est).filter((t) => U.company(s, t).status === 'active').sort((a, b) => gainPct(b) - gainPct(a))[0];
     if (best && gainPct(best) > 0.08) {
       const c = U.company(s, best);
-      if (p.bot === 'hard' && gainPct(best) > 0.3 && p.loan < R.loanMax && p.cash < c.price * R.block * 3) BR.act(s, p.id, { type: 'loan' });
+      if (p.bot !== 'easy' && gainPct(best) > 0.25 && p.cash < c.price * R.block * 3 && U.loanLimit(s, p) > 0) BR.act(s, p.id, { type: 'loan', amt: Math.min(U.loanLimit(s, p), R.loanStep * (p.bot === 'hard' ? 2 : 1)) });
       const share = lastPass ? 1 : st.greed;
       const blocks = Math.floor(Math.min(p.cash * share, p.cash) / (c.price * R.block));
       if (blocks > 0) return { type: 'buy', tk: best, blocks };
     }
 
     // 5. clear expensive loans
-    if (p.loan > 0 && p.cash > R.loanStep * 1.5) BR.act(s, p.id, { type: 'repay' });
+    if (p.loan > 0 && p.cash > R.loanStep * 1.5) BR.act(s, p.id, { type: 'repay', amt: Math.min(p.loan, p.cash - R.loanStep) });
+    if (lastPass && p.cash > R.loanStep * 2 && p.bot === 'hard') BR.act(s, p.id, { type: 'fdIn', amt: Math.floor(p.cash / 2 / 10000) * 10000 });
     return { type: 'pass' };
   }
 
