@@ -63,7 +63,7 @@
   // ---------------------------------------------------------------- screens
   let rainT = null;
   function show(id) {
-    $$('.screen').forEach((s) => { if (s.id !== 'scr-splash' && s.id !== 'scr-studio') s.classList.toggle('active', s.id === 'scr-' + id); });
+    $$('.screen').forEach((s) => { if (s.id !== 'scr-studio') s.classList.toggle('active', s.id === 'scr-' + id); });
     UI.screen = id;
     if (id === 'title') { startRain(); renderHome(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
@@ -122,8 +122,7 @@
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
     $('#btn-stats').onclick = () => { BR.sfx('tap'); statsModal(); };
-    $('#btn-settings').onclick = $('#btn-settings2').onclick = () => { BR.sfx('tap'); settingsModal(); if (UI.screen === 'title') renderHome(); };
-    $('#btn-sound-home').onclick = () => { BR.sound.toggle(); BR.sfx('tap'); renderHome(); };
+    $('#btn-settings').onclick = () => { BR.sfx('tap'); settingsModal(); };
     applyPrefs();
     $('#btn-host').onclick = hostRoom;
     $('#btn-join').onclick = joinRoom;
@@ -181,43 +180,11 @@
     'Tip: 🕵️ Insider Tip shows the hidden market cards nobody else can see.',
     'Tip: tap any player to see what they own and their latest moves.',
   ];
-  // trader level from lifetime stats: every game, win and podium earns XP
-  function level(st) {
-    const xp = st.played * 50 + st.wins * 150 + st.podium * 50;
-    const lv = Math.floor(Math.sqrt(xp / 100)) + 1;
-    const lo = (lv - 1) * (lv - 1) * 100, hi = lv * lv * 100;
-    return { lv, pct: Math.round((xp - lo) / (hi - lo) * 100) };
-  }
-  const RANKS = ['New trader', 'Day trader', 'Swing trader', 'Market maker', 'Fund manager', 'Big bull', 'Market legend'];
   function renderHome() {
     const pr = store.get('br.profile', { name: 'Trader', avatar: BR.AVATARS[0] });
     const st = stats();
-    const L = level(st);
-    $('#profile-strip').innerHTML = `<span class="ps-av">${esc(pr.avatar || '🦁')}<i class="lv">${L.lv}</i></span><span class="ps-name"><b>${esc(pr.name || 'Trader')}</b><small>${RANKS[Math.min(RANKS.length - 1, Math.floor((L.lv - 1) / 2))]}</small><i class="xp"><i style="width:${L.pct}%"></i></i></span>`;
-    $('#hud-best').textContent = st.best ? `🏆 ${rs(st.best)}` : '';
-    $('#btn-sound-home').textContent = BR.sound.on ? '🔊' : '🔇';
+    $('#profile-strip').innerHTML = `<span class="ps-av">${esc(pr.avatar || '🦁')}</span><span class="ps-name"><b>${esc(pr.name || 'Trader')}</b><small>${st.played ? `${st.wins} wins · ${st.played} games` : 'New trader'}</small></span>${st.best ? `<span class="ps-best"><small>BEST</small>${rs(st.best)}</span>` : ''}`;
     $('#tip-line').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
-    if (!$('#ticker').childElementCount) {
-      const items = BR.COMPANY_POOL.map((c) => {
-        const px = 20 + Math.floor(Math.random() * 18) * 5, ch = (Math.floor(Math.random() * 7) - 3) * 5 || 5;
-        return `<span><b>${c.tk}</b> ₹${px} <em class="${ch > 0 ? 'up' : 'down'}">${ch > 0 ? '▲' : '▼'}${Math.abs(ch)}</em></span>`;
-      }).join('');
-      $('#ticker').innerHTML = items;
-    }
-  }
-  // launch sequence: studio card, then the game splash, then home. A tap skips each step.
-  function splash() {
-    const st = $('#scr-studio'), sp = $('#scr-splash');
-    const fade = (el) => { el.classList.add('out'); setTimeout(() => el.classList.remove('active'), 520); };
-    let stage = 0, t = null;
-    const next = () => {
-      clearTimeout(t);
-      if (stage === 0) { stage = 1; fade(st); sp.classList.add('go'); t = setTimeout(next, 2500); }
-      else if (stage === 1) { stage = 2; fade(sp); }
-    };
-    st.addEventListener('click', next);
-    sp.addEventListener('click', next);
-    t = setTimeout(next, 2200);
   }
   function statsModal() {
     const st = stats();
@@ -723,7 +690,7 @@
       }
     } else if (k === 'endgame') { if (send({ type: 'endgame' })) { closeModal(true); banner('🏁 Final round!', 'gold'); } }
     else if (k.startsWith('pref:')) { const [, key, val] = k.split(':'); const p = prefs(); p[key] = val === 'true' ? true : val === 'false' ? false : val; store.set('br.prefs', p); applyPrefs(); settingsModal(); }
-    else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); if (UI.screen === 'title') renderHome(); }
+    else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); }
     else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); statsModal(); renderHome(); }
     else if (k.startsWith('fi:')) { UI.foundName = ($('#found-name') || {}).value; UI.foundIssue = +k.slice(3); foundModal(v, me); }
     else if (k === 'found') {
@@ -1117,7 +1084,16 @@
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>
     <h4>🌐 Online</h4><p>One player hosts a room and shares the 5-letter code. Up to 6 players; bots can fill empty seats.</p>`;
 
+  // studio intro on launch; a tap skips it
+  function studioIntro() {
+    const st = $('#scr-studio');
+    let done = false;
+    const end = () => { if (done) return; done = true; st.classList.add('out'); setTimeout(() => st.classList.remove('active'), 520); };
+    st.addEventListener('click', end);
+    setTimeout(end, 2300);
+  }
+
   setupScreens();
   show('title');
-  splash();
+  studioIntro();
 })(window.BR = window.BR || {});
