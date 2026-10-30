@@ -6,15 +6,15 @@ All companies, events, cards and artwork in this game are original and fictional
 
 ## Features
 
-- Live trading days with a countdown timer, intraday price ticks, candles and a market index (RUSH 30)
-- Secret tips (some are rumours) that move prices at the closing bell
-- Real-market rules: price impact of big orders, 0.1% brokerage, ±20% circuit limits, insolvency
-- Corporate actions: dividends, bonus, splits, rights issues, buybacks, regulator probes
-- IPOs mid-game with a live subscription meter, grey market premium, lottery allotment and listing day
-- Rush Bank: loans with margin calls, fixed deposits
-- Power cards: Bull Charge, Bear Raid, Insider Peek, Stop-Loss Shield
-- 1 to 5 bots with three skill levels; auto-save after every day
+- Turn-based tabletop play: every round each player is dealt secret price cards (like "KAIR +15")
+- Take turns around the table: buy or sell blocks of 1,000 shares, apply for an IPO, play a gold card, or pass
+- Big reveal at the end of each round: all cards flip and each company moves by its total
+- Bankruptcy at ₹0 wipes shares; a 1:1 bonus at ₹250 doubles them
+- Gold cards: Bull Run, Bear Attack, Safe Shield, Double Trouble, Dividend Day, Bonus Gift, Monsoon Boom, Market Crash, Broker Fees
+- IPOs mid-game with fair-share allotment, and a bank for ₹1 lakh loans
+- 1 to 5 bots with three skill levels; auto-save every round
 - Online rooms for up to 6 players (PeerJS, host runs the game)
+- Cosy wooden-table cartoon look, landscape only
 
 ## Layout
 

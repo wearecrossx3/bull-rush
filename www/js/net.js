@@ -42,7 +42,7 @@
       conn.send({ t: 'welcome', id, code: this.code });
       this.lobby();
     } else if (m.t === 'act' && this.game && conn.brId) {
-      const err = m.a.type === 'bell' ? (BR.ringBell(this.game, conn.brId), null) : BR.act(this.game, conn.brId, m.a);
+      const err = BR.act(this.game, conn.brId, m.a);
       if (err) conn.send({ t: 'error', msg: err });
       this.flush(true);
     }

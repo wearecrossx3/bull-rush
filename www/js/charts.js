@@ -1,6 +1,6 @@
 // Canvas charts: sparklines, intraday line and daily candles.
 (function (BR) {
-  const GREEN = '#00c389', RED = '#ff4d6d', GRID = 'rgba(143,163,214,.12)', MUTED = '#8fa3d6';
+  const GREEN = '#12a46e', RED = '#e5304f', GRID = 'rgba(74,44,18,.12)', MUTED = '#9a7650';
 
   function fit(cv) {
     const r = cv.getBoundingClientRect();

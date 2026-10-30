@@ -46,8 +46,8 @@
       <div class="field"><span>Avatar</span><div class="chips" id="pick-avatar"></div></div>
       <div class="field"><span>Rival bots</span><div class="chips" id="pick-bots" data-opts="1,2,3,4,5" data-val="3"></div></div>
       <div class="field"><span>Bot skill</span><div class="chips" id="pick-skill" data-opts="easy,normal,hard" data-val="normal"></div></div>
-      <div class="field"><span>Trading days</span><div class="chips" id="pick-days" data-opts="6,10,15" data-val="10"></div></div>
-      <div class="field"><span>Day length</span><div class="chips" id="pick-len" data-opts="45,60,90" data-labels="45s,60s,90s" data-val="60"></div></div>
+      <div class="field"><span>Rounds</span><div class="chips" id="pick-days" data-opts="6,8,10" data-val="8"></div></div>
+      <div class="field"><span>Turns per round</span><div class="chips" id="pick-len" data-opts="2,3,4" data-val="3"></div></div>
     </div>
     <button class="btn gold big" id="btn-start">🔔 Ring the opening bell</button>
   </div>
@@ -77,8 +77,8 @@
       <div class="room-code">Room code <b id="room-code">-----</b></div>
       <ul id="lobby-list" class="lobby-list"></ul>
       <div id="host-ctrl" class="hidden">
-        <div class="field"><span>Trading days</span><div class="chips" id="pick-days-on" data-opts="6,10,15" data-val="10"></div></div>
-        <div class="field"><span>Day length</span><div class="chips" id="pick-len-on" data-opts="45,60,90" data-labels="45s,60s,90s" data-val="60"></div></div>
+        <div class="field"><span>Rounds</span><div class="chips" id="pick-days-on" data-opts="6,8,10" data-val="8"></div></div>
+        <div class="field"><span>Turn timer</span><div class="chips" id="pick-len-on" data-opts="20,30,45" data-labels="20s,30s,45s" data-val="30"></div></div>
         <div class="row"><button class="btn ghost" id="btn-addbot">+ Add bot</button><button class="btn gold" id="btn-host-start">Start game</button></div>
       </div>
       <p class="hint" id="lobby-msg">Waiting for players...</p>
@@ -98,29 +98,21 @@
 <section id="scr-game" class="screen">
   <div class="topbar">
     <div class="tb-logo">BULL<span>RUSH</span></div>
-    <div class="tb-day"><small>DAY</small><b id="tb-day">1/10</b></div>
-    <div class="tb-phase" id="tb-phase"><span class="dot"></span><span id="tb-phase-txt">PRE-OPEN</span><b id="tb-timer"></b></div>
-    <div class="tb-index"><small>RUSH 30</small><b id="tb-index">10,000</b><i id="tb-index-chg">0.00%</i></div>
+    <div class="tb-day"><small>ROUND</small><b id="tb-day">1/8</b></div>
+    <div class="tb-turn" id="tb-turn">Your turn!</div>
     <div class="tb-money"><small>CASH</small><b id="tb-cash">₹0</b></div>
     <div class="tb-money"><small>NET WORTH</small><b id="tb-worth">₹0</b><i id="tb-worth-chg"></i></div>
     <button class="btn small" id="btn-bank">🏦 Bank</button>
-    <button class="btn small gold" id="btn-bell">🔔 Close day</button>
     <button class="icon-btn" id="btn-menu">☰</button>
   </div>
-  <div class="main">
-    <div class="col list" id="stock-list"></div>
-    <div class="col detail" id="detail"></div>
-    <div class="col side">
-      <div class="tabs" id="side-tabs">
-        <button data-tab="tips" class="on">Tips</button>
-        <button data-tab="ipo">IPO<i id="ipo-dot" class="badge hidden">•</i></button>
-        <button data-tab="rivals">Rivals</button>
-        <button data-tab="news">News</button>
-      </div>
-      <div class="tab-body" id="tab-body"></div>
+  <div class="table">
+    <div class="board" id="board"></div>
+    <div class="seats-col">
+      <div class="seats" id="seats"></div>
+      <div class="actbox" id="actbox"></div>
     </div>
   </div>
-  <div class="ticker"><div class="ticker-inner" id="ticker"></div></div>
+  <div class="hand" id="hand"></div>
 </section>
 
 <div id="modal" class="modal hidden"><div class="modal-card" id="modal-card"></div></div>

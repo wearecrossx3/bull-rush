@@ -1,127 +1,85 @@
-// Computer traders. They only use what a human would know: their own tips, public news and price action.
+// Computer players. They only use their own hand and the specials everyone has seen played.
 (function (BR) {
   const U = BR.util;
+  const R = BR.RULES;
   const STYLES = {
-    easy: { think: [5, 9], noise: 0.04, conviction: 0.25, rumor: 0.8, loan: 0, power: 0.15 },
-    normal: { think: [3, 6], noise: 0.02, conviction: 0.4, rumor: 0.55, loan: 0.3, power: 0.3 },
-    hard: { think: [2, 4], noise: 0.008, conviction: 0.55, rumor: 0.5, loan: 0.7, power: 0.5 },
+    easy: { noise: 12, greed: 0.5, special: 0.4 },
+    normal: { noise: 5, greed: 0.75, special: 0.7 },
+    hard: { noise: 1, greed: 0.95, special: 0.9 },
   };
 
   function outlook(s, p, st) {
     const est = {};
-    for (const c of s.companies) {
-      if (c.status !== 'active') continue;
-      let e = ((s.macro.fx[c.sector] || 0) + (s.macro.fx.ALL || 0)) / 100;
-      // price action already hints at what others know
-      e += (c.price / c.open - 1) * (st === STYLES.hard ? 0.8 : 0.3);
-      est[c.tk] = e + U.gauss(s) * st.noise;
-    }
-    for (const t of p.tips) if (est[t.tk] !== undefined) est[t.tk] += (t.pct / 100) * (t.rumor ? st.rumor : 1);
-    for (const t of p.intel) if (est[t.tk] !== undefined) est[t.tk] += (t.pct / 100) * (t.rumor ? 0.5 : 0.9);
-    for (const a of s.corp) {
-      if (est[a.tk] === undefined) continue;
-      if (a.type === 'BONUS' || a.type === 'SPLIT') est[a.tk] += 0.025;
-      if (a.type === 'DIV') est[a.tk] += 0.01;
-      if (a.type === 'BUYBACK') est[a.tk] += 0.04;
-      if (a.type === 'RIGHTS') est[a.tk] -= 0.025;
+    for (const c of s.companies) if (c.status === 'active' || c.status === 'ipo') est[c.tk] = (U.rnd(s) - 0.5) * st.noise;
+    for (const k of p.hand) if (k.kind === 'price' && est[k.tk] !== undefined) est[k.tk] += k.v;
+    for (const x of s.plays) {
+      if (x.tk && est[x.tk] !== undefined) {
+        if (x.sp === 'BULL') est[x.tk] += 20;
+        if (x.sp === 'BEAR') est[x.tk] -= 20;
+        if (x.sp === 'DOUBLE') est[x.tk] *= 2;
+        if (x.sp === 'DIVIDEND') est[x.tk] += 5;
+      }
+      if (x.sp === 'BOOM') for (const t in est) est[t] += 10;
+      if (x.sp === 'CRASH') for (const t in est) est[t] -= 10;
     }
     return est;
   }
 
-  function think(s, p) {
+  function decide(s, p) {
     const st = STYLES[p.bot] || STYLES.normal;
     const est = outlook(s, p, st);
-    const frac = 1 - s.timeLeft / s.settings.dayLength;
-    const worth = U.netWorth(s, p);
+    const gainPct = (tk) => est[tk] / U.company(s, tk).price;
+    const lastPass = s.pass === s.settings.turns - 1;
 
-    // sell what looks bad (or lock gains late in the day)
-    for (const tk in p.hold) {
-      const e = est[tk];
-      if (e === undefined) continue;
-      const c = U.company(s, tk);
-      const gain = c.price / (p.cost[tk] || c.price) - 1;
-      if (e < -0.02 || (frac > 0.75 && gain > 0.12 && e < 0.03)) {
-        BR.act(s, p.id, { type: 'sell', tk, qty: p.hold[tk] });
-        return;
-      }
+    // 1. dump anything that looks like it will fall
+    const bad = Object.keys(p.hold).filter((tk) => est[tk] !== undefined && est[tk] < -2 && U.company(s, tk).status === 'active')
+      .sort((a, b) => est[a] * p.hold[a] - est[b] * p.hold[b]);
+    if (bad.length) return { type: 'sell', tk: bad[0], blocks: p.hold[bad[0]] / R.block };
+
+    // 2. play a special card when it helps
+    const sp = p.hand.find((k) => k.kind === 'special');
+    if (sp && U.rnd(s) < st.special) {
+      const owned = Object.keys(p.hold).filter((t) => U.company(s, t).status === 'active').sort((a, b) => p.hold[b] - p.hold[a]);
+      const notOwned = Object.keys(est).filter((t) => !p.hold[t] && U.company(s, t).status === 'active').sort((a, b) => est[a] - est[b]);
+      const k = sp.sp;
+      if ((k === 'BULL' || k === 'DIVIDEND' || k === 'GIFT') && owned[0]) return { type: 'special', card: sp.id, tk: owned[0] };
+      if (k === 'SHIELD' && owned.find((t) => est[t] < 0)) return { type: 'special', card: sp.id, tk: owned.find((t) => est[t] < 0) };
+      if (k === 'DOUBLE' && owned.find((t) => est[t] > 8)) return { type: 'special', card: sp.id, tk: owned.find((t) => est[t] > 8) };
+      if (k === 'BEAR' && notOwned[0]) return { type: 'special', card: sp.id, tk: notOwned[0] };
+      if (k === 'BOOM' && owned.length) return { type: 'special', card: sp.id };
+      if (k === 'CRASH' && !owned.length) return { type: 'special', card: sp.id };
+      if (k === 'LOOT') return { type: 'special', card: sp.id };
     }
 
-    // corporate actions
-    for (const a of s.corp) {
-      const c = U.company(s, a.tk);
-      if (a.type === 'RIGHTS' && p.hold[a.tk] && !p.rights[a.tk] && c.price > a.price * 1.08) {
-        BR.act(s, p.id, { type: 'rights', tk: a.tk, qty: Math.floor(p.hold[a.tk] / 5) });
-      }
-      if (a.type === 'BUYBACK' && p.hold[a.tk] && !p.tender[a.tk]) {
-        BR.act(s, p.id, { type: 'tender', tk: a.tk, qty: Math.floor(p.hold[a.tk] * 0.25) });
-      }
+    // 3. IPO if our cards say it will pop
+    if (s.ipo && !p.ipoBlocks && (est[s.ipo.tk] > 3 || (p.bot === 'easy' && U.rnd(s) < 0.4))) {
+      const b = Math.min(R.ipoMaxBlocks, Math.floor(p.cash * 0.4 / (R.block * s.ipo.issue)));
+      if (b > 0) return { type: 'ipo', blocks: b };
     }
 
-    // IPO
-    if (s.ipo && !p.ipoLots && frac > 0.3) {
-      const keen = s.ipo.gmp / s.ipo.issue;
-      if (keen > 0.03 || (p.bot === 'easy' && U.rnd(s) < 0.5)) {
-        const lots = Math.min(s.ipo.maxLots, Math.floor((p.cash * (keen > 0.15 ? 0.35 : 0.15)) / (s.ipo.lot * s.ipo.issue)));
-        if (lots > 0) BR.act(s, p.id, { type: 'ipo', lots });
-      }
+    // 4. buy the best idea with a big chunk of cash
+    const best = Object.keys(est).filter((t) => U.company(s, t).status === 'active').sort((a, b) => gainPct(b) - gainPct(a))[0];
+    if (best && gainPct(best) > 0.08) {
+      const c = U.company(s, best);
+      if (p.bot === 'hard' && gainPct(best) > 0.3 && p.loan < R.loanMax && p.cash < c.price * R.block * 3) BR.act(s, p.id, { type: 'loan' });
+      const share = lastPass ? 1 : st.greed;
+      const blocks = Math.floor(Math.min(p.cash * share, p.cash) / (c.price * R.block));
+      if (blocks > 0) return { type: 'buy', tk: best, blocks };
     }
 
-    // power cards
-    if (!p.powerUsed && p.powers.length && U.rnd(s) < st.power * (frac > 0.2 ? 1 : 0.3)) {
-      const best = Object.keys(est).sort((a, b) => est[b] - est[a]);
-      const card = p.powers[0];
-      if (card === 'BULL') {
-        const tk = Object.keys(p.hold).sort((a, b) => p.hold[b] * U.company(s, b).price - p.hold[a] * U.company(s, a).price)[0];
-        if (tk && est[tk] !== undefined) return void BR.act(s, p.id, { type: 'power', power: card, tk });
-      } else if (card === 'BEAR') {
-        const tk = best.reverse().find((t) => !p.hold[t]);
-        if (tk) return void BR.act(s, p.id, { type: 'power', power: card, tk });
-      } else if (card === 'PEEK') {
-        return void BR.act(s, p.id, { type: 'power', power: card });
-      } else if (card === 'SHIELD') {
-        const tk = Object.keys(p.hold).find((t) => est[t] !== undefined);
-        if (tk) return void BR.act(s, p.id, { type: 'power', power: card, tk });
-      }
-    }
-
-    // buy the best idea
-    const ranked = Object.keys(est).sort((a, b) => est[b] - est[a]);
-    const tk = ranked[0];
-    if (!tk || est[tk] < 0.03 || frac > 0.92) return;
-    const c = U.company(s, tk);
-    const invested = (p.hold[tk] || 0) * c.price;
-    const want = worth * Math.min(0.6, st.conviction * est[tk] * 8) - invested;
-    if (want < worth * 0.03) return;
-    if (p.cash < want && st.loan > 0 && est[tk] > 0.06 && U.rnd(s) < st.loan) {
-      const lim = U.loanLimit(s, p);
-      const amt = Math.floor(Math.min(lim, want - p.cash) * 0.8);
-      if (amt > 20000) BR.act(s, p.id, { type: 'loan', amt });
-    }
-    const qty = Math.min(U.maxBuy(s, p, c), Math.floor(want / c.price));
-    if (qty > 0) BR.act(s, p.id, { type: 'buy', tk, qty });
-  }
-
-  // Between days: repay expensive loans, park idle cash late in the game.
-  function housekeeping(s, p) {
-    if (p.loan > 0 && p.cash > 0) BR.act(s, p.id, { type: 'repay', amt: Math.min(p.cash * 0.7, p.loan) });
+    // 5. clear expensive loans
+    if (p.loan > 0 && p.cash > R.loanStep * 1.5) BR.act(s, p.id, { type: 'repay' });
+    return { type: 'pass' };
   }
 
   BR.runBots = function (s, dt) {
-    if (s.phase === 'summary' || s.phase === 'brief') {
-      for (const p of s.players) if (p.bot && !p.houseDone) { housekeeping(s, p); p.houseDone = true; }
-      return;
-    }
-    if (s.phase !== 'open') return;
-    for (const p of s.players) {
-      if (!p.bot) continue;
-      p.houseDone = false;
-      const st = STYLES[p.bot] || STYLES.normal;
-      p.nextThink = (p.nextThink === undefined ? st.think[0] * U.rnd(s) : p.nextThink) - dt;
-      if (p.nextThink <= 0) {
-        p.nextThink = st.think[0] + U.rnd(s) * (st.think[1] - st.think[0]);
-        think(s, p);
-      }
-    }
+    if (s.phase !== 'turns') return;
+    const p = U.current(s);
+    if (!p.bot) return;
+    s.botWait -= dt;
+    if (s.botWait > 0) return;
+    const a = decide(s, p);
+    if (BR.act(s, p.id, a)) BR.act(s, p.id, { type: 'pass' });
   };
 
   BR.BOT_NAMES = ['Rocky Raja', 'Bulla Bhai', 'Madam Margin', 'Captain Candle', 'Sensei Sharma', 'Lucky Lakshmi', 'Dalal Dev', 'Pinky Portfolio'];
