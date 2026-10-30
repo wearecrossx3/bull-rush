@@ -103,12 +103,15 @@
     const pool = shuffle(s, BR.COMPANY_POOL.slice());
     s.palette = shuffle(s, PALETTE.slice());
     s.companies = BR.START_PRICES.map((start, i) => newCompany(s, Object.assign({ start }, pool[i]), i));
-    s.ipoDefs = BR.IPO_PRICES.map((start, i) => Object.assign({ start }, pool[8 + i]));
+    s.ipoDefs = pool.slice(8).map((d, i) => Object.assign({ start: BR.IPO_PRICES[i % BR.IPO_PRICES.length] }, d));
     s.ipoRounds = [];
-    for (const f of [0.3, 0.55, 0.8]) {
-      const r = Math.max(2, Math.round(s.settings.rounds * f));
-      if (r < s.settings.rounds && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
-    }
+    const n = s.settings.rounds;
+    if (n && n <= 10) {
+      for (const f of [0.3, 0.55, 0.8]) {
+        const r = Math.max(2, Math.round(n * f));
+        if (r < n && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
+      }
+    } else scheduleIpos(s);
     s.players = roster.map((r, i) => ({
       id: r.id, name: r.name, bot: r.bot || null, color: r.color || BR.COLORS[i % 6], avatar: r.avatar || BR.AVATARS[i],
       cash: s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
@@ -120,6 +123,14 @@
     startRound(s);
     return s;
   };
+
+  // Long and endless games get an IPO every 4 rounds (rounds: 0 means no limit).
+  function scheduleIpos(s) {
+    const n = s.settings.rounds;
+    const until = n || s.round + 40;
+    for (let r = 3; r < until || (!n && r <= until); r += 4) if (r > s.round && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
+  }
+  const lastRound = (s) => !!s.settings.rounds && s.round >= s.settings.rounds;
 
   // ---------------------------------------------------------------- market brain
   // Decides how many rise/fall cards each company gets so no stock runs away for ever:
@@ -181,7 +192,8 @@
       // a player's own company jumps the queue; a scheduled IPO waits a round
       def = s.foundQueue.shift();
       s.ipoRounds = s.ipoRounds.map((r) => (r === s.round ? r + 1 : r));
-    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length) def = s.ipoDefs.shift();
+    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length && s.companies.filter((c) => !c.founder).length < 12) def = s.ipoDefs.shift();
+    if (!s.settings.rounds && !s.ipoRounds.some((r) => r > s.round)) scheduleIpos(s);
     if (def) {
       const c = newCompany(s, def, s.companies.length);
       c.status = 'ipo'; c.issue = def.start; c.history = [];
@@ -341,17 +353,21 @@
     s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice() };
     log(s, `Round ${s.round} revealed! Biggest mover: ${rows[0] ? rows[0].name : '-'}.`, 'sys');
 
-    if (s.round >= s.settings.rounds) {
-      s.phase = 'ended';
-      for (const p of s.players) { p.cash += p.fd - p.loan; p.fd = 0; p.loan = 0; }
-      s.final = s.players.map((p) => ({ id: p.id, name: p.name, worth: netWorth(s, p), avatar: p.avatar, color: p.color, bot: p.bot }))
-        .sort((a, b) => b.worth - a.worth);
-    } else {
+    if (lastRound(s)) endGame(s);
+    else {
       s.phase = 'reveal';
       s.timeLeft = s.settings.auto ? 25 : 0;
       for (const p of s.players) p.ready = !!p.bot;
     }
     s.v++;
+  }
+
+  // Net worth already counts deposits and subtracts loans, so the game can be extended after it ends.
+  function endGame(s) {
+    s.phase = 'ended';
+    s.settings.rounds = s.round;
+    s.final = s.players.map((p) => ({ id: p.id, name: p.name, worth: netWorth(s, p), avatar: p.avatar, color: p.color, bot: p.bot }))
+      .sort((a, b) => b.worth - a.worth);
   }
 
   function marginCall(s, p, events) {
@@ -464,7 +480,7 @@
       if (p.founded) return 'You already have your own company';
       if (netWorth(s, p) < R.founderAt) return `Reach ₹${fmt(R.founderAt)} net worth first`;
       if (p.cash < R.listingFee) return `Listing costs ₹${fmt(R.listingFee)} in cash`;
-      if (s.round >= s.settings.rounds) return 'No rounds left to list a company';
+      if (lastRound(s)) return 'No rounds left to list a company';
       const name = String(a.name || '').replace(/[^A-Za-z0-9 &.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || `${p.name.split(' ')[0]} Ventures`;
       const issue = R.founderIssue.includes(+a.issue) ? +a.issue : R.founderIssue[1];
       const tk = ticker(s, name);
@@ -505,6 +521,27 @@
       return null;
     },
     ready(s, p) { p.ready = true; return null; },
+    // the table owner (offline player or online host) can change the length of the game
+    extend(s, p, a) {
+      if (p.id !== s.players[0].id) return 'Only the host can change the rounds';
+      const by = Math.max(1, Math.min(20, Math.floor(a.by) || 5));
+      if (s.phase === 'ended') {
+        s.final = null; s.phase = 'reveal'; s.timeLeft = 0;
+        for (const o of s.players) o.ready = !!o.bot;
+        s.settings.rounds = s.round + by;
+      } else if (s.settings.rounds) s.settings.rounds += by;
+      else return null;
+      scheduleIpos(s);
+      log(s, `➕ ${by} more rounds! The game now runs to round ${s.settings.rounds}.`, 'sys');
+      return null;
+    },
+    endgame(s, p) {
+      if (p.id !== s.players[0].id) return 'Only the host can end the game';
+      if (s.phase === 'reveal') endGame(s);
+      else s.settings.rounds = s.round;
+      log(s, '🏁 This is the final round!', 'sys');
+      return null;
+    },
   };
   const TURN_ACTIONS = ['buy', 'sell', 'ipo', 'special', 'found', 'pass'];
   function ticker(s, name) {
@@ -513,12 +550,12 @@
     for (let i = 2; taken.has(base); i++) base = base.slice(0, 3) + i;
     return base;
   }
-  function canFound(s, p) { return !p.founded && s.phase === 'turns' && s.round < s.settings.rounds && netWorth(s, p) >= R.founderAt && p.cash >= R.listingFee; }
+  function canFound(s, p) { return !p.founded && s.phase === 'turns' && !lastRound(s) && netWorth(s, p) >= R.founderAt && p.cash >= R.listingFee; }
 
   BR.act = function (s, pid, a) {
     const p = player(s, pid);
     if (!p || !ACTIONS[a.type]) return 'Unknown action';
-    if (s.phase === 'ended') return 'Game over';
+    if (s.phase === 'ended' && a.type !== 'extend') return 'Game over';
     if (TURN_ACTIONS.includes(a.type)) {
       if (s.phase !== 'turns') return 'Wait for the next round';
       if (current(s).id !== pid) return 'Wait for your turn';

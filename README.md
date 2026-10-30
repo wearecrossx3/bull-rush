@@ -24,6 +24,7 @@ All companies, events, cards and artwork in this game are original and fictional
 - 1 to 5 bots with three skill levels; auto-save every round
 - Online rooms for up to 6 players (PeerJS, host runs the game)
 - Clean, minimal look that works on phones and iPads, portrait and landscape
+- 6 to 20 rounds or unlimited; the host can add rounds, call the last round, or keep playing after the results
 - Home screen with Quick Game, stats and settings (sound, vibration, bot speed)
 
 ## Web app (iPhone / iPad)

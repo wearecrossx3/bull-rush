@@ -473,3 +473,4 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eef1f6; font-weight: 800; }
 .mbtn.quick .mi { background: #fff3c4; }
 @media (max-height: 420px) and (orientation: landscape) { .profile-strip { padding: 3px 10px; } .ps-av { width: 30px; height: 30px; font-size: 18px; } .tip-line { display: none; } .mbtn small { display: none; } }
+.menu-list .row .btn { flex: 1; }
