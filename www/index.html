@@ -57,7 +57,7 @@
     </div>
   </div>
   <div class="tip-line" id="tip-line"></div>
-  <div class="version">v5.1 · All companies, logos and events are fictional</div>
+  <div class="version">v5.2 · All companies, logos and events are fictional</div>
 </section>
 
 <!-- Offline setup -->
@@ -69,6 +69,7 @@
       <div class="field"><span>Avatar</span><div class="chips" id="pick-avatar"></div></div>
       <div class="field"><span>Rival bots</span><div class="chips" id="pick-bots" data-opts="1,2,3,4,5" data-val="3"></div></div>
       <div class="field"><span>Bot skill</span><div class="chips" id="pick-skill" data-opts="easy,normal,hard" data-val="normal"></div></div>
+      <div class="field"><span>Companies</span><div class="chips" id="pick-cos" data-opts="6,8,10,12,0" data-labels="6,8,10,12,🎲 Random" data-val="8"></div></div>
       <div class="field"><span>Rounds</span><div class="chips" id="pick-days" data-opts="6,8,10,15,20,0" data-labels="6,8,10,15,20,∞" data-val="8"></div></div>
       <div class="field"><span>Turns per round</span><div class="chips" id="pick-len" data-opts="2,3,4" data-val="3"></div></div>
     </div>
@@ -100,6 +101,7 @@
       <div class="room-code">Room code <b id="room-code">-----</b></div>
       <ul id="lobby-list" class="lobby-list"></ul>
       <div id="host-ctrl" class="hidden">
+        <div class="field"><span>Companies</span><div class="chips" id="pick-cos-on" data-opts="6,8,10,12,0" data-labels="6,8,10,12,🎲 Random" data-val="8"></div></div>
         <div class="field"><span>Rounds</span><div class="chips" id="pick-days-on" data-opts="6,8,10,15,20,0" data-labels="6,8,10,15,20,∞" data-val="8"></div></div>
         <div class="field"><span>Turn timer</span><div class="chips" id="pick-len-on" data-opts="20,30,45" data-labels="20s,30s,45s" data-val="30"></div></div>
         <div class="row"><button class="btn ghost" id="btn-addbot">+ Add bot</button><button class="btn gold" id="btn-host-start">Start game</button></div>
