@@ -40,6 +40,8 @@
     leaf: '<path d="M5 35 C5 14 17 4 36 4 C36 25 26 36 5 35 Z"/>',
   };
   function logo(c, size) {
+    const L = !c.founder && BR.LOGOS[c.tk];
+    if (L) return `<svg class="logo-svg tile" viewBox="0 0 40 40" width="${size || 30}" height="${size || 30}" aria-hidden="true"><rect width="40" height="40" rx="10" fill="${L.c}"/>${L.m(L.c)}</svg>`;
     const m = c.mark || { shape: 'circle', letters: c.tk.slice(0, 2), tilt: 0, ring: false };
     const sh = SHAPE[m.shape] || SHAPE.circle;
     return `<svg class="logo-svg" viewBox="0 0 40 40" width="${size || 30}" height="${size || 30}" aria-hidden="true">
