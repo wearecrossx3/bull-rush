@@ -91,6 +91,27 @@
     // 2b. rich bots list their own company
     if (p.bot !== 'easy' && U.canFound(s, p)) return { type: 'found', name: `${p.name.split(' ')[0]} ${U.pick(s, ['Ventures', 'Industries', 'Labs', 'Capital', 'Motors'])}`, issue: 50 };
 
+    // 2c. take over companies we hold half of, or raid a rival boss
+    for (const tk of Object.keys(p.hold)) {
+      const c = U.company(s, tk);
+      const m = U.takeoverMove(s, p, c);
+      if (m === 'takeover') return { type: 'takeover', tk };
+      if (m === 'hostile' && p.bot !== 'easy' && est[tk] >= 0 && U.rnd(s) < 0.5) {
+        const b = U.player(s, c.boss);
+        if (b && (b.hold[tk] || 0) * Math.ceil(c.price * R.hostilePremium) <= p.cash * 0.8) return { type: 'hostile', tk };
+      }
+    }
+    // ...and push towards control when we are close
+    if (p.bot !== 'easy') {
+      const near = Object.keys(p.hold).map((tk) => U.company(s, tk)).find((c) => c && c.status === 'active' && !c.boss && est[c.tk] >= 0
+        && p.hold[c.tk] >= (c.supply || R.supply) * 0.35 && p.hold[c.tk] < (c.supply || R.supply) * R.takeoverAt);
+      if (near) {
+        const want = Math.ceil(((near.supply || R.supply) * R.takeoverAt - p.hold[near.tk]) / R.block);
+        const blocks = Math.min(want, Math.floor(U.available(s, near) / R.block), Math.floor(p.cash / (near.price * R.block)));
+        if (blocks > 0) return { type: 'buy', tk: near.tk, blocks };
+      }
+    }
+
     // 3. IPO if our cards say it will pop
     if (s.ipo && s.ipo.founder !== p.id && !p.ipoBlocks && (est[s.ipo.tk] > 3 || (p.bot === 'easy' && U.rnd(s) < 0.4))) {
       const b = Math.min(R.ipoMaxBlocks, Math.floor(p.cash * 0.4 / (R.block * s.ipo.issue)));
