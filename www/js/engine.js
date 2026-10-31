@@ -53,7 +53,7 @@
   }
   function netWorth(s, p) { return p.cash + p.fd + holdingsValue(s, p) + (p.ipoBlocked || 0) - p.loan; }
   function loanLimit(s, p) { if (s.settings.loans === false) return 0; return Math.max(0, Math.floor((R.baseCredit + R.loanLtv * (holdingsValue(s, p) + p.fd) - p.loan) / 10000) * 10000); }
-  function available(s, c) { return (c.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
+  function available(s, c) { return (c.supply || s.settings.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
   function maxBlocks(s, p, c) {
     if (!live(c)) return 0;
     return Math.max(0, Math.min(Math.floor(p.cash / (c.price * R.block)), Math.floor(available(s, c) / R.block)));
@@ -86,7 +86,7 @@
     return {
       tk: def.tk, name: def.name, sector: def.sector, pitch: def.pitch, color: BR.LOGOS && BR.LOGOS[def.tk] ? BR.LOGOS[def.tk].c : s.palette[idx % s.palette.length],
       mark: { shape: pick(s, SHAPES), letters: (words[0][0] + (words[1] ? words[1][0] : words[0][1])).toUpperCase(), tilt: Math.floor(rnd(s) * 4), ring: rnd(s) < 0.5 },
-      price: def.start, start: def.start, history: [def.start], last: 0, status: 'active', supply: R.supply,
+      price: def.start, start: def.start, history: [def.start], last: 0, status: 'active', supply: s.settings.supply || R.supply,
     };
   }
   function goldCard(s, p) { return { id: 'g' + Math.floor(rnd(s) * 1e9), sp: pick(s, Object.keys(BR.SPECIALS)) }; }
@@ -189,7 +189,7 @@
 
     for (const c of s.companies) {
       if (c.status === 'bankrupt') {
-        c.status = 'active'; c.price = c.start; c.supply = R.supply; c.history.push(c.start);
+        c.status = 'active'; c.price = c.start; c.supply = s.settings.supply || R.supply; c.history.push(c.start);
         log(s, `${c.name} is back on the board at ₹${c.start} after restructuring.`, 'corp');
       }
     }
