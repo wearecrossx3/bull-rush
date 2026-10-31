@@ -84,7 +84,7 @@
   function newCompany(s, def, idx) {
     const words = def.name.split(/\s+/);
     return {
-      tk: def.tk, name: def.name, sector: def.sector, pitch: def.pitch, color: s.palette[idx % s.palette.length],
+      tk: def.tk, name: def.name, sector: def.sector, pitch: def.pitch, color: BR.LOGOS && BR.LOGOS[def.tk] ? BR.LOGOS[def.tk].c : s.palette[idx % s.palette.length],
       mark: { shape: pick(s, SHAPES), letters: (words[0][0] + (words[1] ? words[1][0] : words[0][1])).toUpperCase(), tilt: Math.floor(rnd(s) * 4), ring: rnd(s) < 0.5 },
       price: def.start, start: def.start, history: [def.start], last: 0, status: 'active', supply: R.supply,
     };

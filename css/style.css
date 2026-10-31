@@ -581,3 +581,6 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .pc-av { font-size: 54px; line-height: 1; margin-bottom: 6px; }
 .pc-card .btn { width: 100%; }
 @media (max-height: 430px) and (orientation: landscape) { .pc-card { padding: 14px 20px; } .pc-av { font-size: 40px; } .pc-card h2 { font-size: 22px; } }
+/* v6.1 brand-colour logos: hand-card bands use white text so dark brand colours stay readable */
+.card .band { color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .35); }
+.logo-svg.tile { border-radius: 22%; flex: none; }
