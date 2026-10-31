@@ -21,6 +21,7 @@
   <img class="studio-logo" src="icons/frontpage-studios.png" alt="FRONT PAGE studios">
 </div>
 
+<div id="pass-cover" class="pass-cover hidden"><div class="pc-card"><div class="pc-av" id="pc-av">🙂</div><small>Pass the phone to</small><h2 id="pc-name">Player</h2><p>Others, look away. Your cards are secret.</p><button class="btn gold big" id="pc-go">👀 I'm ready, show my cards</button></div></div>
 <!-- Title -->
 <section id="scr-title" class="screen active">
   <div class="coin-rain" id="coin-rain"></div>
@@ -55,7 +56,7 @@
         <button class="mbtn quick" id="btn-quick"><span class="mi">⚡</span><span><b>Quick Game</b><small>3 bots · 6 rounds · start now</small></span></button>
         <button class="mbtn quick" id="btn-career"><span class="mi">💼</span><span><b>Career</b><small id="career-sub">Your money carries on, game after game</small></span></button>
       </div>
-      <button class="mbtn online" data-go="online"><span class="mi">🌐</span><span><b>Play Online</b><small>Rooms with friends</small></span></button>
+      <button class="mbtn online" data-go="online"><span class="mi">🌐</span><span><b>Play with Friends</b><small>Same phone, Wi-Fi or anywhere</small></span></button>
       <button class="mbtn cont hidden" id="btn-continue"><span class="mi">⟲</span><span><b>Continue</b><small>Your saved game</small></span></button>
       <div class="row three">
         <button class="btn" data-go="howto">📘 Rules</button>
@@ -65,7 +66,7 @@
     </div>
   </div>
   <div class="tip-line" id="tip-line"></div>
-  <div class="version">v5.9 · All companies, logos and events are fictional</div>
+  <div class="version">v6.0 · All companies, logos and events are fictional</div>
 </section>
 
 <!-- Offline setup -->
@@ -88,7 +89,16 @@
 <!-- Online lobby -->
 <section id="scr-online" class="screen">
   <div class="panel setup">
-    <header><button class="icon-btn" data-go="title">‹</button><h2>Play online</h2></header>
+    <header><button class="icon-btn" data-go="title">‹</button><h2>Play with friends</h2></header>
+    <div class="chips mode-tabs" id="pick-mode" data-opts="pass,wifi,net" data-labels="📱 Pass &amp; Play,📶 Same Wi-Fi,🌍 Anywhere" data-val="wifi"></div>
+    <div id="pass-home" class="hidden">
+      <div class="field"><span>Players</span><div class="chips" id="pick-pp" data-opts="2,3,4,5,6" data-val="2"></div></div>
+      <div class="pp-names" id="pp-names"></div>
+      <div class="field"><span>Add bots</span><div class="chips" id="pick-pp-bots" data-opts="0,1,2,3" data-val="0"></div></div>
+      <div class="field"><span>Rounds</span><div class="chips" id="pick-pp-days" data-opts="6,8,10,15" data-val="8"></div></div>
+      <button class="btn gold big" id="btn-pass-start">🔔 Start on this phone</button>
+      <p class="hint">No internet needed. Everyone plays on this one phone and passes it on when their turn comes, like Ludo. Your cards stay hidden until you tap "show my cards".</p>
+    </div>
     <div id="online-home">
       <label>Your name<input id="in-name-on" maxlength="14" placeholder="Trader"></label>
       <div class="online-cols">
@@ -103,7 +113,7 @@
           <button class="btn" id="btn-join">Join</button>
         </div>
       </div>
-      <p class="hint">Online play connects phones directly. All players need internet. Works best on Wi-Fi.</p>
+      <p class="hint" id="mode-hint">Friends on the same Wi-Fi connect directly for the fastest game.</p>
     </div>
     <div id="online-lobby" class="hidden">
       <div class="room-code">Room code <b id="room-code">-----</b></div>

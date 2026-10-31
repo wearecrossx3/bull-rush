@@ -65,6 +65,8 @@
   function show(id) {
     $$('.screen').forEach((s) => { s.classList.toggle('active', s.id === 'scr-' + id); });
     UI.screen = id;
+    if (id === 'title' && !UI.ctrl) { [UI.host, UI.client].forEach((x) => { if (x) try { x.close(); } catch (e) { /* ignore */ } }); UI.host = UI.client = null; }
+    if (id === 'online') { $('#online-lobby').classList.add('hidden'); $('#pick-mode').classList.remove('hidden'); setMode($('#pick-mode').dataset.val); }
     if (id === 'title') { startRain(); renderHome(); careerSub(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
   function startRain() {
@@ -117,7 +119,12 @@
       BR.sfx('tap');
       av.dataset.val = b.dataset.v; av.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
     });
-    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on'].forEach((q) => chips($(q)));
+    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days'].forEach((q) => chips($(q)));
+    $('#pick-mode').addEventListener('click', () => setMode($('#pick-mode').dataset.val));
+    $('#pick-pp').addEventListener('click', ppNames);
+    $('#btn-pass-start').onclick = startPass;
+    $('#pc-go').onclick = () => { BR.sfx('tap'); $('#pass-cover').classList.add('hidden'); UI.passShown = UI.passWant; UI.dirty = true; UI.renderKey = ''; UI.handHtml = ''; };
+    setMode('wifi'); ppNames();
     $('#btn-start').onclick = startOffline;
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
@@ -151,7 +158,7 @@
   function rematchLocal(v) {
     if (!v.setup) { quitGame(); show('setup'); return; }
     const st = Object.assign({}, v.setup.settings, { seed: undefined, daily: undefined });
-    begin(LocalCtrl(BR.createGame(st, v.setup.roster), 'me'));
+    begin(st.pass ? PassCtrl(BR.createGame(Object.assign(st, { pass: { last: null } }), v.setup.roster)) : LocalCtrl(BR.createGame(st, v.setup.roster), 'me'));
   }
 
   function startOffline() {
@@ -244,6 +251,74 @@
     return fresh;
   }
 
+  // ---------------------------------------------------------------- play with friends
+  const MODE_HINT = {
+    wifi: 'Friends on the same Wi-Fi connect directly for the fastest game.',
+    net: 'Friends anywhere can join with their own internet (mobile data works). Share the room code on WhatsApp.',
+  };
+  function setMode(m) {
+    $('#pick-mode').dataset.val = m;
+    $('#pick-mode').querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.v === m));
+    $('#pass-home').classList.toggle('hidden', m !== 'pass');
+    $('#online-home').classList.toggle('hidden', m === 'pass');
+    if (MODE_HINT[m]) $('#mode-hint').textContent = MODE_HINT[m];
+  }
+  function ppNames() {
+    const n = +$('#pick-pp').dataset.val, box = $('#pp-names');
+    const old = [...box.querySelectorAll('input')].map((i) => i.value);
+    const prof = store.get('br.profile', { name: '', avatar: BR.AVATARS[0] });
+    const avs = [prof.avatar].concat(BR.AVATARS.filter((a) => a !== prof.avatar));
+    let h = '';
+    for (let i = 0; i < n; i++) h += `<label>${avs[i]}<input maxlength="14" placeholder="Player ${i + 1}" value="${esc(old[i] != null ? old[i] : i === 0 ? prof.name || '' : '')}"></label>`;
+    box.innerHTML = h;
+  }
+  // everyone shares one phone: whoever's turn it is becomes "me", and a cover hides the cards between players
+  function PassCtrl(s) {
+    const humans = s.players.filter((p) => !p.bot).map((p) => p.id);
+    let me = s.settings.pass.last || humans[0];
+    return {
+      local: true, pass: true, s,
+      get me() {
+        if (s.phase === 'turns') { const c = s.players[s.seat]; if (!c.bot && c.connected) me = c.id; }
+        s.settings.pass.last = me;
+        return me;
+      },
+      view() { return s; },
+      send(a) {
+        if (a.type === 'ready') { humans.forEach((id) => BR.act(s, id, a)); return null; }
+        return BR.act(s, this.me, a);
+      },
+      step(dt) { BR.runBots(s, dt); BR.tick(s, dt); },
+    };
+  }
+  function startPass() {
+    BR.sfx('tap');
+    const names = [...$('#pp-names').querySelectorAll('input')].map((i, k) => (i.value.trim() || `Player ${k + 1}`).slice(0, 14));
+    const avs = [...$('#pp-names').querySelectorAll('label')].map((l) => l.firstChild.textContent);
+    const roster = names.map((name, i) => ({ id: 'p' + i, name, avatar: avs[i], color: BR.COLORS[i % 6] }));
+    const used = names.slice();
+    for (let i = 0; i < +$('#pick-pp-bots').dataset.val; i++) {
+      const name = BR.BOT_NAMES.find((n) => !used.includes(n)) || 'Bot'; used.push(name);
+      roster.push({ id: 'bot' + i, name, bot: 'normal', avatar: BR.AVATARS[(roster.length * 3 + 1) % BR.AVATARS.length], color: BR.COLORS[roster.length % 6] });
+    }
+    const s = BR.createGame({ rounds: +$('#pick-pp-days').dataset.val, turns: 3, companies: 8, pass: { last: null } }, roster);
+    begin(PassCtrl(s));
+  }
+  // shows the hand-over screen whenever the phone has to go to a different player
+  function passCover(v) {
+    const cover = $('#pass-cover');
+    const cur = v.players[v.seat];
+    const need = v.phase === 'turns' && !cur.bot && cur.id !== UI.passShown;
+    if (!need) { if (v.phase !== 'turns') cover.classList.add('hidden'); return false; }
+    if (UI.passWant !== cur.id || cover.classList.contains('hidden')) {
+      UI.passWant = cur.id;
+      $('#pc-av').textContent = cur.avatar; $('#pc-name').textContent = cur.name;
+      cover.classList.remove('hidden');
+      BR.sfx('notify');
+    }
+    return true;
+  }
+
   // ---------------------------------------------------------------- career
   // One long run: you start each game with the money you finished the last one with,
   // and every game's profit adds to your career total. Bots get tougher as you win.
@@ -315,7 +390,7 @@
 
   function continueSaved() {
     const sv = store.get(SAVE, null);
-    if (sv) begin(LocalCtrl(sv, 'me'));
+    if (sv) begin(sv.settings.pass ? PassCtrl(sv) : LocalCtrl(sv, 'me'));
   }
 
   function hostRoom() {
@@ -323,7 +398,7 @@
     $('#lobby-msg').textContent = 'Creating room...';
     const host = new BR.Host(Object.assign({ color: BR.COLORS[0] }, me), {
       onReady(code) {
-        $('#online-home').classList.add('hidden'); $('#online-lobby').classList.remove('hidden'); $('#host-ctrl').classList.remove('hidden');
+        $('#online-home').classList.add('hidden'); $('#pick-mode').classList.add('hidden'); $('#online-lobby').classList.remove('hidden'); $('#host-ctrl').classList.remove('hidden');
         $('#room-code').textContent = code;
         $('#lobby-msg').textContent = 'Share the code. Add bots or wait for friends, then start.';
       },
@@ -356,7 +431,7 @@
     let started = false;
     const cl = new BR.Client(me, code, {
       onJoined(c) {
-        $('#online-home').classList.add('hidden'); $('#online-lobby').classList.remove('hidden'); $('#host-ctrl').classList.add('hidden');
+        $('#online-home').classList.add('hidden'); $('#pick-mode').classList.add('hidden'); $('#online-lobby').classList.remove('hidden'); $('#host-ctrl').classList.add('hidden');
         $('#room-code').textContent = c; $('#lobby-msg').textContent = 'Joined! Waiting for the host to start...';
       },
       onLobby: renderLobby,
@@ -375,9 +450,9 @@
       onError(m) {
         toast(m, 'err');
         if (started) modalAlert('Connection lost', m);
-        else { $('#online-home').classList.remove('hidden'); $('#online-lobby').classList.add('hidden'); }
+        else { $('#online-home').classList.remove('hidden'); $('#pick-mode').classList.remove('hidden'); $('#online-lobby').classList.add('hidden'); }
       },
-    });
+    }, $('#pick-mode').dataset.val);
     UI.client = cl;
   }
 
@@ -389,7 +464,7 @@
   let raf = null, last = 0, acc = 0;
   function begin(ctrl) {
     UI.ctrl = ctrl;
-    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.freshAch = null; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = ''; UI.reactSeen = {}; UI.reactInit = false; const oc = $('#coach'); if (oc) oc.remove();
+    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.freshAch = null; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = ''; UI.reactSeen = {}; UI.reactInit = false; UI.passShown = null; UI.passWant = null; $('#pass-cover').classList.add('hidden'); const oc = $('#coach'); if (oc) oc.remove();
     closeModal(true);
     show('game');
     BR.sfx('bell');
@@ -413,6 +488,7 @@
   }
   function quitGame() {
     const c = $('#coach'); if (c) c.remove();
+    $('#pass-cover').classList.add('hidden');
     if (UI.ctrl && UI.ctrl.quit) UI.ctrl.quit();
     UI.ctrl = null;
     cancelAnimationFrame(raf);
@@ -426,6 +502,7 @@
   function later(fn, ms) { UI.timers.push(setTimeout(fn, ms)); }
 
   function render(v) {
+    if (UI.ctrl.pass && passCover(v)) return;
     const me = meP(v);
     if (!me) return;
     phaseModals(v, me);
@@ -1171,12 +1248,14 @@
   function finalModal(v, me) {
     clearTimers();
     const f = v.final;
+    const pass = !!v.settings.pass;
+    if (pass) me = v.players.find((p) => p.id === f[0].id) || me;
     const rank = f.findIndex((x) => x.id === me.id) + 1;
     const mine = f[rank - 1];
     const title = TITLES.find(([t]) => t(mine))[1];
     const best = store.get('br.best2', 0);
-    if (!UI.ctrl.online && mine.worth > best) store.set('br.best2', mine.worth);
-    if (!UI.statsSaved) {
+    if (!UI.ctrl.online && !pass && mine.worth > best) store.set('br.best2', mine.worth);
+    if (!UI.statsSaved && !pass) {
       UI.statsSaved = true;
       const st = stats();
       st.played++; if (rank === 1) st.wins++; if (rank <= 3) st.podium++; st.best = Math.max(st.best, mine.worth);
@@ -1191,17 +1270,17 @@
     const pl = (p) => v.players.find((x) => x.id === p.id) || p;
     const podSpot = (p, i) => !p ? '' : `<div class="fp-col r${i}">
         <div class="fp-av" style="--pc:${pl(p).color || '#ccd'}">${esc(p.avatar || '🙂')}${i === 1 ? '<i>👑</i>' : ''}</div>
-        <b class="fp-name">${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><span class="fp-worth">${rs(p.worth)}</span>
+        <b class="fp-name">${esc(p.name)}${p.id === me.id && !pass ? ' (you)' : ''}</b><span class="fp-worth">${rs(p.worth)}</span>
         <div class="fp-step">${i}</div></div>`;
     const pod = podSpot(f[1], 2) + podSpot(f[0], 1) + podSpot(f[2], 3);
-    const rest = f.slice(3).map((p, i) => `<div class="fr-row${p.id === me.id ? ' me' : ''}"><span class="fr-rk">${i + 4}</span><span class="fr-av">${esc(p.avatar)}</span><b>${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><span>${rs(p.worth)}</span></div>`).join('');
+    const rest = f.slice(3).map((p, i) => `<div class="fr-row${p.id === me.id ? ' me' : ''}"><span class="fr-rk">${i + 4}</span><span class="fr-av">${esc(p.avatar)}</span><b>${esc(p.name)}${p.id === me.id && !pass ? ' (you)' : ''}</b><span>${rs(p.worth)}</span></div>`).join('');
     const gain = ((mine.worth / me.worth[0]) - 1) * 100;
     const steps = me.worth.slice(1).map((w, i) => ({ r: i + 1, d: w - me.worth[i] }));
     const bestR = steps.slice().sort((a, b) => b.d - a.d)[0];
     const tile = (lab, val, sub, c) => `<div class="fs-tile"><small>${lab}</small><b class="${c || ''}">${val}</b><span>${sub}</span></div>`;
     openModal('final', `
       <div class="fin-head${rank === 1 ? ' win' : ''}"><div class="fin-rank">${rank === 1 ? '🏆' : '#' + rank}</div>
-        <div><h2>${rank === 1 ? 'You won!' : `You finished #${rank}`}</h2><span class="fin-title">${title}</span></div></div>
+        <div><h2>${pass ? `${esc(me.name)} wins!` : rank === 1 ? 'You won!' : `You finished #${rank}`}</h2><span class="fin-title">${title}</span></div></div>
       <div class="fin-pod">${pod}</div>
       ${rest ? `<div class="fin-rest">${rest}</div>` : ''}${daily}${v.settings.career ? careerResult(v, mine, rank) : ''}
       ${UI.freshAch && UI.freshAch.length ? `<div class="fin-ach"><span>🏅 Unlocked</span>${UI.freshAch.map((a) => `<b>${a.ic} ${a.name}</b>`).join('')}</div>` : ''}
@@ -1296,6 +1375,7 @@
     <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
     <h4>📰 Market news</h4><p>Most rounds open with a headline. Good news lifts every company in that sector at the reveal, bad news drags them down. "Dividend season" pays every shareholder ₹2 per share.</p>
     <h4>🐻 Short Sell</h4><p>A gold card that bets on a fall: you earn ₹10,000 for every ₹1 the company drops. If it rises you pay the same, at most ₹2 lakh.</p>
+    <h4>👥 Play with friends</h4><p><b>📱 Pass &amp; Play:</b> no internet needed, everyone shares one phone and passes it on. <b>📶 Same Wi-Fi:</b> friends nearby connect directly. <b>🌍 Anywhere:</b> friends in other places join the room code with their own internet or mobile data.</p>
     <h4>💼 Career</h4><p>A long run against bots. Each game starts with the money you finished the last one with, and every game's profit adds to your career total. Win more and the bots get tougher. Drop below the starting cash and you get a fresh start.</p>
     <h4>📅 Daily challenge and 🏅 achievements</h4><p>Open 🏆 Stats on the home screen. The daily challenge is the same game for everyone each day: hit the target to beat it. Achievements unlock as you play.</p>
     <h4>😀 Reactions</h4><p>Tap 😀 at the top during a game to send an emoji or a quick message to the table.</p>

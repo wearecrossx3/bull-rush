@@ -567,3 +567,17 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
   .fin-stats { margin-top: 4px; } .fs-tile { padding: 4px 10px; } .fs-tile > span { font-size: 11px; } .fin-foot { margin-top: 6px; }
 }
 @media (max-width: 480px) { .m-replay h2 small { display: none; } }
+
+/* v6.0 play with friends: mode tabs, pass & play names, hand-over cover */
+.mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.mode-tabs .chip { padding: 9px 6px; font-size: 13px; white-space: nowrap; }
+.pp-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.pp-names label { display: flex; flex-direction: row; min-width: 0; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.pp-names input { flex: 1; min-width: 0; width: 100%; padding: 7px 10px; }
+#pass-home .btn.big { width: 100%; margin-top: 8px; }
+.pass-cover { position: fixed; inset: 0; z-index: 60; background: rgba(18, 26, 48, .96); display: grid; place-items: center; padding: 16px; }
+.pc-card { background: #fff; border-radius: 22px; padding: 22px 26px; text-align: center; max-width: 360px; width: 100%; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+.pc-card small { color: var(--muted); font-weight: 800; } .pc-card h2 { margin: 2px 0 6px; font-size: 26px; } .pc-card p { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+.pc-av { font-size: 54px; line-height: 1; margin-bottom: 6px; }
+.pc-card .btn { width: 100%; }
+@media (max-height: 430px) and (orientation: landscape) { .pc-card { padding: 14px 20px; } .pc-av { font-size: 40px; } .pc-card h2 { font-size: 22px; } }
