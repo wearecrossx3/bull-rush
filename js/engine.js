@@ -96,6 +96,7 @@
     const s = {
       v: 0,
       settings: Object.assign({ rounds: 8, turns: 3, startCash: R.startCash, auto: false, turnTime: 0 }, settings),
+      setup: { settings: Object.assign({}, settings), roster: JSON.parse(JSON.stringify(roster)) },
       round: 0, pass: 0, seat: 0, phase: 'turns', timeLeft: 0, botWait: 0,
       rng: (settings.seed || Date.now()) | 0,
       companies: [], players: [], feed: [], trades: [], plays: [], reveal: null, ipo: null,
@@ -209,6 +210,8 @@
       log(s, `🚀 IPO! ${c.name} opens at ₹${def.start}/share. Apply on your turn this round.`, 'ipo');
     }
 
+    pickNews(s);
+
     const cos = s.companies.filter((c) => c.status === 'active' || c.status === 'ipo');
     const n = s.players.length;
     const each = R.priceCards;
@@ -228,6 +231,18 @@
     s.botWait = R.botThink[0] + 1;
     log(s, `Round ${s.round}: cards dealt. ${current(s).name} starts.`, 'sys');
     s.v++;
+  }
+
+  // most rounds open with a headline; it only uses sectors that are on the board
+  function pickNews(s) {
+    s.news = null;
+    if (s.round === 1 || rnd(s) > 0.75) return;
+    const sectors = new Set(s.companies.filter(live).map((c) => c.sector));
+    const pool = BR.NEWS.filter((x) => !x.sector || sectors.has(x.sector));
+    const n = pool[Math.floor(rnd(s) * pool.length)];
+    if (!n) return;
+    s.news = Object.assign({}, n);
+    log(s, `📰 ${n.text}`, n.d > 0 || n.all > 0 || n.dividend ? 'up' : 'down');
   }
 
   function nextTurn(s) {
@@ -294,6 +309,8 @@
       if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
       if (on('CHARGE')) { total += 25; mods.push('🐂 +25'); }
       if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
+      const nd = newsMove(s, c);
+      if (nd) { total += nd; mods.push(`📰 ${nd > 0 ? '+' : ''}${nd}`); }
       if (on('UPCAP') && total > 15) { total = 15; mods.push('🚧 max +15'); }
       if (on('LOWCAP') && total < -15) { total = -15; mods.push('🪂 max −15'); }
       if (on('FREEZE')) { total = 0; mods.push('🔒 frozen'); }
@@ -301,9 +318,23 @@
       let to = Math.max(0, from + total);
       const row = { tk: c.tk, name: c.name, color: c.color, mark: c.mark, from, to, total, cards, mods, note: '' };
 
-      if (on('DIVIDEND')) {
-        for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * R.dividend; trade(s, p, 'div', c.tk, p.hold[c.tk], R.dividend); }
-        row.note = `💰 Dividend ₹${R.dividend}/share paid`;
+      const div = (on('DIVIDEND') ? R.dividend : 0) + (s.news && s.news.dividend || 0);
+      if (div) {
+        for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * div; trade(s, p, 'div', c.tk, p.hold[c.tk], div); }
+        row.note = `💰 Dividend ₹${div}/share paid`;
+      }
+      for (const x of s.plays.filter((y) => y.sp === 'SHORT' && y.tk === c.tk)) {
+        const p = player(s, x.pid);
+        if (!p) continue;
+        const drop = from - Math.max(0, to);
+        let amt = drop * R.shortPerRupee;
+        if (amt < 0) {
+          amt = Math.max(amt, -R.shortMaxLoss);
+          const fromCash = Math.min(p.cash, -amt);
+          p.cash -= fromCash; p.loan += -amt - fromCash;
+        } else p.cash += amt;
+        trade(s, p, 'short', c.tk, 0, amt, 'Short Sell');
+        events.push(`🐻 ${p.avatar} ${p.name}'s Short Sell on ${c.tk} ${amt >= 0 ? 'won' : 'lost'} ₹${fmt(Math.abs(amt))}.`);
       }
       if (to < from) {
         for (const x of s.plays.filter((y) => y.sp === 'NET' && y.tk === c.tk)) {
@@ -356,6 +387,13 @@
       cash[p.id] = p.cash - cashBefore[p.id];
     }
     rows.sort((a, b) => b.total - a.total);
+    // bots sometimes react to a big win or loss
+    for (const p of s.players) {
+      if (!p.bot || rnd(s) > 0.3 || Math.abs(pl[p.id]) < 50000) continue;
+      const opts = pl[p.id] > 0 ? [1, 4, 6, 8] : [2, 3, 7, 9];
+      s.reactN = (s.reactN || 0) + 1;
+      p.react = { i: opts[Math.floor(rnd(s) * opts.length)], n: s.reactN };
+    }
     s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice() };
     log(s, `Round ${s.round} revealed! Biggest mover: ${rows[0] ? rows[0].name : '-'}.`, 'sys');
 
@@ -366,6 +404,13 @@
       for (const p of s.players) p.ready = !!p.bot;
     }
     s.v++;
+  }
+
+  function newsMove(s, c) {
+    const n = s.news;
+    if (!n) return 0;
+    if (n.all) return n.all;
+    return n.sector === c.sector ? n.d : 0;
   }
 
   // Net worth already counts deposits and subtracts loans, so the game can be extended after it ends.
@@ -498,6 +543,13 @@
       log(s, `🏢 ${p.avatar} ${p.name} founded ${name}! Its IPO opens next round at ₹${issue}.`, 'ipo');
       return 'turn';
     },
+    react(s, p, a) {
+      const i = Math.floor(a.i);
+      if (!(i >= 0 && i < BR.REACTS.length)) return 'Unknown reaction';
+      s.reactN = (s.reactN || 0) + 1;
+      p.react = { i, n: s.reactN };
+      return null;
+    },
     pass(s, p) { p.lastAct = { r: s.round, act: 'pass' }; log(s, `${p.avatar} ${p.name} passed.`, 'sys'); return 'turn'; },
     loan(s, p, a) {
       const amt = Math.min(Math.floor(a.amt || R.loanStep), loanLimit(s, p));
@@ -562,7 +614,7 @@
   BR.act = function (s, pid, a) {
     const p = player(s, pid);
     if (!p || !ACTIONS[a.type]) return 'Unknown action';
-    if (s.phase === 'ended' && a.type !== 'extend') return 'Game over';
+    if (s.phase === 'ended' && a.type !== 'extend' && a.type !== 'react') return 'Game over';
     if (TURN_ACTIONS.includes(a.type)) {
       if (s.phase !== 'turns') return 'Wait for the next round';
       if (current(s).id !== pid) return 'Wait for your turn';
@@ -609,5 +661,5 @@
     return v;
   };
 
-  BR.util = { canFound, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
+  BR.util = { newsMove, canFound, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
 })(window.BR = window.BR || {});

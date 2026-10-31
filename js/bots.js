@@ -16,7 +16,7 @@
     const rup = known.filter((x) => x.sp === 'RUPUP').length - known.filter((x) => x.sp === 'RUPDN').length;
     for (const t in est) {
       const c = U.company(s, t);
-      est[t] += rup * c.price * 0.1;
+      est[t] += rup * c.price * 0.1 + U.newsMove(s, c);
       for (const x of s.plays) {
         if (x.tk !== t || (x.secret && x.pid !== p.id)) continue;
         if (x.sp === 'SCAM') est[t] -= 40;
@@ -55,6 +55,7 @@
       const fall = owned.find((t) => est[t] < -5);
       if ((k === 'RIGHTS' || k === 'DIVIDEND') && owned[0] && est[owned[0]] >= 0) return { type: 'special', card: sp.id, tk: owned[0] };
       if ((k === 'LOWCAP' || k === 'FREEZE') && fall) return { type: 'special', card: sp.id, tk: fall };
+      if (k === 'SHORT' && notOwned[0] && est[notOwned[0]] < -8) return { type: 'special', card: sp.id, tk: notOwned[0] };
       if (k === 'SCAM' && notOwned[0]) return { type: 'special', card: sp.id, tk: notOwned[0] };
       if (k === 'UPCAP') { const t = Object.keys(est).filter((x) => !p.hold[x] && U.company(s, x).status === 'active').sort((a, b) => est[b] - est[a])[0]; if (t) return { type: 'special', card: sp.id, tk: t }; }
       if (k === 'RUPUP' && owned.length) return { type: 'special', card: sp.id };
