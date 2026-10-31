@@ -121,7 +121,7 @@
       BR.sfx('tap');
       av.dataset.val = b.dataset.v; av.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
     });
-    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days', ...['cash', 'gold', 'loan', 'news'].flatMap((k) => [`#pick-${k}-on`, `#pick-${k}-pp`])].forEach((q) => chips($(q)));
+    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days', ...['cash', 'gold', 'sup', 'loan', 'news'].flatMap((k) => [`#pick-${k}-on`, `#pick-${k}-pp`])].forEach((q) => chips($(q)));
     $('#pick-mode').addEventListener('click', () => setMode($('#pick-mode').dataset.val));
     $('#pick-pp').addEventListener('click', ppNames);
     $('#btn-pass-start').onclick = startPass;
@@ -405,7 +405,7 @@
   // the host's house rules: starting money, gold cards, bank loans and news (suffix 'on' = online room, 'pp' = pass & play)
   function houseRules(sfx) {
     const val = (k) => $(`#pick-${k}-${sfx}`).dataset.val;
-    return { startCash: +val('cash'), gold: +val('gold'), loans: val('loan') === '1', news: val('news') === '1' };
+    return { startCash: +val('cash'), gold: +val('gold'), loans: val('loan') === '1', news: val('news') === '1', supply: +val('sup') };
   }
   const MODE_HINT = {
     wifi: 'Friends on the same Wi-Fi connect directly for the fastest game.',
