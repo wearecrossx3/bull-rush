@@ -66,6 +66,7 @@ input { font-family: inherit; }
 .mbtn.cont { background: linear-gradient(180deg, #8ef0c8, #2fbf86); box-shadow: 0 5px 0 #127a51, 0 10px 18px rgba(23, 32, 54, .2); color: #04291b; }
 @keyframes pulse { 50% { transform: scale(1.03); } }
 .menu-btns .row .btn { flex: 1; }
+.mrow { display: contents; }
 .version { position: absolute; bottom: 8px; right: 14px; color: #5b6785; font-size: 11px; opacity: .8; z-index: 1; }
 
 /* ---------- panels / setup ---------- */
@@ -364,6 +365,7 @@ input:focus { border-color: var(--gold); }
   .trade-grid { gap: 8px; } .stat-grid { margin-bottom: 4px; } .stat-grid div { padding: 3px 8px; } .av.big { width: 40px; height: 40px; font-size: 22px; }
   .rev-row { padding: 2px 6px; } .rev-tot { font-size: 14px; } .modal-card h2 { margin-bottom: 4px; } .m-foot { margin-top: 6px; }
   .mascot { width: 110px; } .logo h1 { font-size: 46px; } .mbtn { padding: 6px 14px; } .mbtn .mi { width: 34px; height: 34px; } .menu-btns { gap: 8px; }
+  .mrow { display: flex; gap: 8px; } .mrow .mbtn { flex: 1; min-width: 0; gap: 8px; padding: 6px 10px; } .mrow .mbtn b { white-space: nowrap; font-size: 15px; } .mrow .mbtn .mi { width: 28px; height: 28px; font-size: 17px; border-radius: 10px; }
 }
 @media (max-width: 760px) and (orientation: landscape) { .table { grid-template-columns: 1fr 180px; } }
 

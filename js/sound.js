@@ -83,6 +83,19 @@
   };
 
   BR.sfx = function (name) { if (on && FX[name]) try { FX[name](); } catch (e) { /* audio blocked */ } };
+  // Quick-chat voice: native TTS in the Android app (its WebView has no speechSynthesis), browser voice on the web.
+  BR.speak = function (text) {
+    if (!on || !text) return;
+    try {
+      if (window.BRNative && BRNative.speak) { BRNative.speak(text); return; }
+      const ss = window.speechSynthesis;
+      if (!ss) return;
+      ss.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-IN'; u.rate = 1.05;
+      ss.speak(u);
+    } catch (e) { /* no voice */ }
+  };
   BR.sound = {
     get on() { return on; },
     toggle() { on = !on; try { localStorage.setItem('br.sound', on ? 'on' : 'off'); } catch (e) { /* ignore */ } return on; },

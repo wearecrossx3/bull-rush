@@ -121,8 +121,8 @@
     } else scheduleIpos(s);
     s.players = roster.map((r, i) => ({
       id: r.id, name: r.name, bot: r.bot || null, color: r.color || BR.COLORS[i % 6], avatar: r.avatar || BR.AVATARS[i],
-      cash: s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
-      ready: false, connected: true, worth: [s.settings.startCash], seat: i, lastAct: null, spy: null,
+      cash: r.cash || s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
+      ready: false, connected: true, worth: [r.cash || s.settings.startCash], seat: i, lastAct: null, spy: null,
     }));
     for (const p of s.players) for (let i = 0; i < R.startGold; i++) p.gold.push(goldCard(s, p));
     s.dealer = Math.floor(rnd(s) * s.players.length);
