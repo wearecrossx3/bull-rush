@@ -419,6 +419,10 @@ input:focus { border-color: var(--gold); }
 @media (min-width: 700px) and (orientation: portrait) {
   .board, .board[data-n="8"] { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; }
   .seat { min-width: 210px; }
+  /* the tablet rules above give the table a side column; in portrait it must stay one column */
+  .table { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .topbar { height: auto; padding: 8px 12px; }
+  .seats { flex: none; }
 }
 
 /* ---------- v5 clean theme: flat cards, soft shadows, fewer borders ---------- */
@@ -589,3 +593,22 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .mascot.appic { border-radius: 24%; filter: none; box-shadow: 0 8px 0 rgba(23, 32, 54, .18), 0 14px 28px rgba(18, 50, 79, .25); }
 #scr-title { background: linear-gradient(135deg, #fff6d8 0%, #ffe08a 55%, #ffc94a 100%); }
 #scr-title::before { inset: 0; animation: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 400' preserveAspectRatio='none'><path d='M0 360 L120 320 L200 340 L320 250 L420 280 L540 170 L640 200 L800 60' fill='none' stroke='%23ffffff' stroke-width='10' stroke-linejoin='round' opacity='.6'/><path d='M0 360 L120 320 L200 340 L320 250 L420 280 L540 170 L640 200 L800 60 L800 400 L0 400 Z' fill='%23ffffff' opacity='.25'/></svg>") no-repeat bottom / 100% 100%; }
+
+/* v6.3 responsive fixes: nothing may spill out of its button on small screens */
+.mrow .mbtn > span:last-child { min-width: 0; }
+@media (max-height: 420px) and (orientation: landscape) {
+  .menu-btns { min-width: min(330px, 52vw); }
+  .mrow .mbtn { gap: 6px; padding: 6px 8px; } .mrow .mbtn b { font-size: 14px; }
+}
+@media (max-height: 420px) and (orientation: landscape) and (max-width: 700px) {
+  .logo h1 { font-size: 38px; letter-spacing: 1px; } .mascot { width: 92px; } .title-wrap { gap: 4vw; }
+  .mrow .mbtn .mi { width: 24px; height: 24px; font-size: 15px; border-radius: 8px; } .mrow .mbtn b { font-size: 13px; }
+}
+.mode-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 420px) { .mode-tabs .chip { white-space: normal; line-height: 1.15; font-size: 12px; padding: 6px 4px; border-radius: 14px; } }
+@media (max-width: 360px) { .stepper { gap: 5px; } .stepper b { min-width: 0; flex: 1; font-size: 16px; } .stepper button:not(.btn) { width: 36px; height: 36px; } .stepper .btn.small { padding: 6px 8px; } }
+.online-cols > * { min-width: 0; } .ocard input, .code-in { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 360px) { .code-in { letter-spacing: 3px; } }
+@media (orientation: portrait) and (max-height: 700px) { .tip-line { display: none; } }
+@media (orientation: portrait) and (max-height: 700px) { .mascot { width: 92px; } .logo h1 { font-size: 44px; } .title-wrap { gap: 12px; } .mbtn { padding: 7px 14px; } }
+@media (orientation: portrait) and (max-height: 600px) { .mascot { width: 68px; } .logo h1 { font-size: 36px; } .logo .tag { display: none; } .mbtn small { display: none; } .menu-btns { gap: 7px; } .profile-strip { padding: 3px 10px; } }
