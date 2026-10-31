@@ -353,7 +353,7 @@
   let raf = null, last = 0, acc = 0;
   function begin(ctrl) {
     UI.ctrl = ctrl;
-    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = ''; UI.reactSeen = {}; UI.reactInit = false; const oc = $('#coach'); if (oc) oc.remove();
+    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.freshAch = null; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = ''; UI.reactSeen = {}; UI.reactInit = false; const oc = $('#coach'); if (oc) oc.remove();
     closeModal(true);
     show('game');
     BR.sfx('bell');
@@ -1143,37 +1143,56 @@
       st.played++; if (rank === 1) st.wins++; if (rank <= 3) st.podium++; st.best = Math.max(st.best, mine.worth);
       store.set('br.stats', st);
       const fresh = checkAch(v, me, rank, st);
-      fresh.forEach((a, i) => later(() => { banner(`${a.ic} Achievement!<small>${a.name}</small>`, 'gold'); BR.sfx('bonus'); }, 1500 + i * 1700));
+      UI.freshAch = fresh;
+      if (fresh.length) later(() => BR.sfx('bonus'), 1200);
       if (v.settings.daily && mine.worth >= v.settings.daily.target) { const d = store.get('br.daily', {}); d[v.settings.daily.date] = 1; store.set('br.daily', d); }
     }
     const daily = v.settings.daily ? `<div class="daily ${mine.worth >= v.settings.daily.target ? 'done' : ''}"><span class="d-ic">📅</span><div><b>Daily challenge ${mine.worth >= v.settings.daily.target ? 'beaten! ✅' : 'missed'}</b><small>Target ${rs(v.settings.daily.target)} · you made ${rs(mine.worth)}</small></div></div>` : '';
     if (rank === 1) { BR.sfx('fanfare'); confetti(); } else BR.sfx('win');
-    const order = [f[1], f[0], f[2]].filter(Boolean);
-    const pod = order.map((p) => `<div class="pod p${f.indexOf(p) + 1}"><div class="av">${esc(p.avatar || '🙂')}</div><b>${esc(p.name)}</b><small>${rs(p.worth)}</small><div class="pn">#${f.indexOf(p) + 1}</div></div>`).join('');
-    const rest = f.slice(3).map((p, i) => `<div class="kv"><span>#${i + 4} ${esc(p.avatar)} ${esc(p.name)}</span><b>${rs(p.worth)}</b></div>`).join('');
+    const pl = (p) => v.players.find((x) => x.id === p.id) || p;
+    const podSpot = (p, i) => !p ? '' : `<div class="fp-col r${i}">
+        <div class="fp-av" style="--pc:${pl(p).color || '#ccd'}">${esc(p.avatar || '🙂')}${i === 1 ? '<i>👑</i>' : ''}</div>
+        <b class="fp-name">${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><span class="fp-worth">${rs(p.worth)}</span>
+        <div class="fp-step">${i}</div></div>`;
+    const pod = podSpot(f[1], 2) + podSpot(f[0], 1) + podSpot(f[2], 3);
+    const rest = f.slice(3).map((p, i) => `<div class="fr-row${p.id === me.id ? ' me' : ''}"><span class="fr-rk">${i + 4}</span><span class="fr-av">${esc(p.avatar)}</span><b>${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><span>${rs(p.worth)}</span></div>`).join('');
     const gain = ((mine.worth / v.settings.startCash) - 1) * 100;
+    const steps = me.worth.slice(1).map((w, i) => ({ r: i + 1, d: w - me.worth[i] }));
+    const bestR = steps.slice().sort((a, b) => b.d - a.d)[0];
+    const tile = (lab, val, sub, c) => `<div class="fs-tile"><small>${lab}</small><b class="${c || ''}">${val}</b><span>${sub}</span></div>`;
     openModal('final', `
-      <h2>${rank === 1 ? '🏆 You won!' : `You finished #${rank}`}<small>${title}</small></h2>
-      <div class="podium">${pod}</div>${rest}${daily}
-      <div class="m-grid"><div class="m-box"><h3>YOUR RESULT</h3><div class="macro-big">${rs(mine.worth)} <span class="${cls(Math.round(gain))}">(${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%)</span></div>
-      <div class="hint">Best ever: ${rs(Math.max(best, mine.worth))}</div></div>
-      <div class="m-box"><h3>WEALTH RACE</h3><canvas id="race2" style="width:100%;height:70px"></canvas></div></div>
-      <div class="m-foot"><button class="btn" data-m="quit">Main menu</button><button class="btn" data-m="replay">📈 Replay</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ +5 rounds</button>' : ''}${!UI.ctrl.online || (isHost(v) && UI.rematch) ? '<button class="btn gold big" data-m="rematch">🔁 Rematch</button>' : ''}</div>`);
-    setTimeout(() => {
-      const cv = $('#race2');
-      if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth })));
-    }, 50);
+      <div class="fin-head${rank === 1 ? ' win' : ''}"><div class="fin-rank">${rank === 1 ? '🏆' : '#' + rank}</div>
+        <div><h2>${rank === 1 ? 'You won!' : `You finished #${rank}`}</h2><span class="fin-title">${title}</span></div></div>
+      <div class="fin-pod">${pod}</div>
+      ${rest ? `<div class="fin-rest">${rest}</div>` : ''}${daily}
+      ${UI.freshAch && UI.freshAch.length ? `<div class="fin-ach"><span>🏅 Unlocked</span>${UI.freshAch.map((a) => `<b>${a.ic} ${a.name}</b>`).join('')}</div>` : ''}
+      <div class="fin-stats">
+        ${tile('YOUR NET WORTH', rs(mine.worth), `<span class="${cls(Math.round(gain))}">${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%</span> from ${rs(v.settings.startCash)}`)}
+        ${tile('BEST ROUND', bestR ? (bestR.d >= 0 ? '+' : '') + rs(bestR.d) : '-', bestR ? 'Round ' + bestR.r : '', bestR && bestR.d >= 0 ? 'up' : 'down')}
+        ${tile('BEST EVER', rs(Math.max(best, mine.worth)), mine.worth > best ? '🎉 New record!' : 'Your record')}
+      </div>
+      <div class="fin-foot"><button class="btn" data-m="quit">🏠 Menu</button><button class="btn" data-m="replay">📈 Replay</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ 5 rounds</button>' : ''}${!UI.ctrl.online || (isHost(v) && UI.rematch) ? '<button class="btn gold big" data-m="rematch">🔁 Rematch</button>' : ''}</div>`);
   }
 
   // the whole game round by round: everyone's net worth line, plus your result each round
   function replayModal(v, me) {
-    const legend = v.players.map((p) => `<span class="lg"><i style="background:${p.color}"></i>${esc(p.avatar)} ${esc(p.name)}</span>`).join('');
-    const rows = me.worth.slice(1).map((w, i) => { const d = w - me.worth[i]; return `<div class="kv"><span>Round ${i + 1}</span><b>${rs(w)} <small class="${cls(Math.round(d))}">${d >= 0 ? '+' : ''}${rs(d)}</small></b></div>`; }).join('');
-    openModal('replay', `<h2>📈 Game replay<small>Net worth after every round</small></h2>
-      <canvas id="race3" style="width:100%;height:170px"></canvas><div class="legend">${legend}</div>
-      <div class="sec-h">YOUR ROUNDS</div><div class="replay-rows">${rows}</div>
+    const fin = v.players.map((p) => ({ p, w: p.worth[p.worth.length - 1] })).sort((a, b) => b.w - a.w);
+    const legend = fin.map(({ p, w }, i) => `<div class="rp-leg${p.id === me.id ? ' me' : ''}"><i style="background:${p.color}"></i><span>${i + 1}. ${esc(p.avatar)} ${esc(p.name)}</span><b>${rs(w)}</b></div>`).join('');
+    const steps = me.worth.slice(1).map((w, i) => ({ r: i + 1, w, d: w - me.worth[i] }));
+    const big = Math.max(1, ...steps.map((x) => Math.abs(x.d)));
+    const bestR = steps.length ? steps.reduce((a, b) => (b.d > a.d ? b : a)).r : 0;
+    const worstR = steps.length ? steps.reduce((a, b) => (b.d < a.d ? b : a)).r : 0;
+    const rows = steps.map((x) => `<div class="rp-row${x.r === bestR ? ' best' : x.r === worstR && x.d < 0 ? ' worst' : ''}">
+        <span class="rp-r">R${x.r}</span>
+        <div class="rp-bar"><i class="${x.d >= 0 ? 'pos' : 'neg'}" style="width:${Math.max(3, Math.abs(x.d) / big * 100)}%"></i></div>
+        <span class="rp-d ${cls(Math.round(x.d))}">${x.d >= 0 ? '+' : '−'}${rs(Math.abs(x.d))}</span><b class="rp-w">${rs(x.w)}</b></div>`).join('');
+    openModal('replay', `<h2>📈 Game replay<small>Net worth after every round</small><button class="x" data-m="final">✕</button></h2>
+      <div class="rp-wrap">
+        <div class="rp-chart"><canvas id="race3"></canvas><div class="rp-legend">${legend}</div></div>
+        <div class="rp-side"><div class="sec-h">YOUR ROUNDS <span class="rp-key"><i class="pos"></i>best <i class="neg"></i>worst</span></div><div class="rp-rows">${rows}</div></div>
+      </div>
       <div class="m-foot"><button class="btn gold" data-m="final">◀ Back to results</button></div>`);
-    setTimeout(() => { const cv = $('#race3'); if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth }))); }, 50);
+    setTimeout(() => { const cv = $('#race3'); if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth })), { axes: true }); }, 60);
   }
 
   const isHost = (v) => !!v && v.players[0].id === UI.ctrl.me;

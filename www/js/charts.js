@@ -96,20 +96,44 @@
     g.fillText('Daily candles' + (live ? ' · today live' : ''), 4, h - 3);
   };
 
-  BR.worthChart = function (cv, series) {
+  // Net worth race. With opts.axes it draws ₹ gridlines, round numbers and end dots.
+  BR.worthChart = function (cv, series, opts) {
     const { g, w, h } = fit(cv);
     const all = series.flatMap((s) => s.pts);
     if (!all.length) return;
+    const axes = opts && opts.axes;
     let lo = Math.min(...all), hi = Math.max(...all);
     if (hi - lo < 1) hi = lo + 1;
+    const pad = (hi - lo) * 0.08; lo = Math.max(0, lo - pad); hi += pad;
     const n = Math.max(...series.map((s) => s.pts.length));
-    const xv = (i) => 4 + (i / Math.max(1, n - 1)) * (w - 8);
-    const yv = (v) => h - 6 - ((v - lo) / (hi - lo)) * (h - 12);
-    for (const s of series) {
-      g.strokeStyle = s.color; g.lineWidth = s.me ? 3 : 1.6; g.beginPath();
+    const L = axes ? 46 : 4, Rr = axes ? 10 : 4, T = axes ? 10 : 6, B = axes ? 22 : 6;
+    const xv = (i) => L + (i / Math.max(1, n - 1)) * (w - L - Rr);
+    const yv = (v) => h - B - ((v - lo) / (hi - lo)) * (h - T - B);
+    const money = (v) => v < 1000 ? '0' : v >= 1e7 ? (v / 1e7).toFixed(1) + ' Cr' : (v / 1e5).toFixed(v >= 1e6 ? 0 : 1) + ' L';
+    if (axes) {
+      g.font = '600 11px Nunito, system-ui, sans-serif'; g.textBaseline = 'middle';
+      for (let i = 0; i <= 4; i++) {
+        const v = lo + ((hi - lo) * i) / 4, yy = yv(v);
+        g.strokeStyle = 'rgba(30,42,68,.08)'; g.lineWidth = 1; g.beginPath(); g.moveTo(L, yy); g.lineTo(w - Rr, yy); g.stroke();
+        g.fillStyle = '#7c87a3'; g.textAlign = 'right'; g.fillText('₹' + money(v).replace(/^0$/, '0'), L - 6, yy);
+      }
+      g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      const step = Math.ceil(n / 12);
+      for (let i = 0; i < n; i += step) { g.fillStyle = '#7c87a3'; g.fillText(i === 0 ? 'Start' : 'R' + i, xv(i), h - 6); }
+    }
+    const order = series.slice().sort((a, b) => (a.me ? 1 : 0) - (b.me ? 1 : 0));
+    for (const s of order) {
+      g.strokeStyle = s.color; g.lineWidth = s.me ? 3.5 : 2; g.lineJoin = 'round'; g.lineCap = 'round'; g.globalAlpha = s.me ? 1 : 0.85;
+      g.beginPath();
       s.pts.forEach((v, i) => (i ? g.lineTo(xv(i), yv(v)) : g.moveTo(xv(i), yv(v))));
       g.stroke();
+      if (axes) {
+        const i = s.pts.length - 1;
+        g.fillStyle = s.color; g.beginPath(); g.arc(xv(i), yv(s.pts[i]), s.me ? 5 : 3.5, 0, Math.PI * 2); g.fill();
+        if (s.me) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); }
+      }
     }
+    g.globalAlpha = 1;
   };
 
   // Animated candle field for the title screen
