@@ -54,7 +54,38 @@
     TIP: { name: 'Insider Tip', icon: '🕵️', target: false, desc: 'Peek at the hidden market cards for this round.' },
     TAX: { name: 'Tax Raid', icon: '🧾', target: false, desc: 'The richest rival pays 5% of their net worth to the bank.' },
     LUCKY: { name: 'Lucky Bonus', icon: '🎁', target: false, desc: 'Collect ₹1 lakh cash right now.' },
+    SHORT: { name: 'Short Sell', icon: '🐻', target: true, desc: 'Bet on a fall: earn ₹10,000 for every ₹1 it drops at the reveal. If it rises you pay the same (at most ₹2 lakh).' },
   };
+
+  // Emoji and quick-chat reactions anyone can send at any time.
+  BR.REACTS = ['😂', '😎', '😱', '😡', '🔥', '👏', '🤑', '😭', 'Good move!', 'Oh no!', 'Hurry up!', 'Well played', 'Watch this', 'Sorry!'];
+
+  // Market news: one headline opens most rounds and nudges a whole sector at the reveal.
+  BR.NEWS = [
+    { sector: 'IT', d: 10, text: 'Global tech giants sign big outsourcing deals' },
+    { sector: 'IT', d: -10, text: 'New visa rules hit software exporters' },
+    { sector: 'TEL', d: 10, text: 'Government opens new 5G spectrum at low prices' },
+    { sector: 'TEL', d: -5, text: 'Price war breaks out between mobile networks' },
+    { sector: 'AUTO', d: 10, text: 'Festive season: car bookings at a record high' },
+    { sector: 'AUTO', d: -10, text: 'Fuel prices jump, buyers delay new cars' },
+    { sector: 'PHAR', d: 10, text: 'New medicine gets fast-track approval' },
+    { sector: 'PHAR', d: -5, text: 'Price caps announced on common medicines' },
+    { sector: 'INFRA', d: 10, text: 'Budget doubles spending on roads and metros' },
+    { sector: 'INFRA', d: -5, text: 'Heavy monsoon stalls construction sites' },
+    { sector: 'FMCG', d: 5, text: 'Good rains: village demand is booming' },
+    { sector: 'FMCG', d: -5, text: 'Sugar and oil prices squeeze snack makers' },
+    { sector: 'METAL', d: 10, text: 'Steel demand soars on new factories' },
+    { sector: 'METAL', d: -10, text: 'Cheap imports flood the metal market' },
+    { sector: 'BANK', d: 10, text: 'Central bank cuts interest rates' },
+    { sector: 'BANK', d: -10, text: 'Bad loans rise at lenders' },
+    { sector: 'AIR', d: 10, text: 'Holiday season: flights sold out' },
+    { sector: 'AIR', d: -10, text: 'Jet fuel price shoots up' },
+    { sector: 'ENER', d: 10, text: 'Green energy subsidy announced' },
+    { sector: 'ENER', d: -5, text: 'Power tariffs frozen for a year' },
+    { all: 5, text: 'Foreign investors pour money into the market' },
+    { all: -5, text: 'Global markets wobble, investors turn nervous' },
+    { dividend: 2, text: 'Dividend season: every company pays ₹2 per share' },
+  ];
 
   BR.RULES = {
     startCash: 500000,
@@ -79,6 +110,8 @@
     listingFee: 1000000,  // paid in cash to list it
     founderShares: 30000, // promoter shares the founder keeps
     founderIssue: [30, 50, 80],
+    shortPerRupee: 10000, // Short Sell pays this much per ₹1 fall
+    shortMaxLoss: 200000,
     botThink: [1.8, 3.6], // seconds a bot "thinks" before acting
   };
 })(window.BR = window.BR || {});

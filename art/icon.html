@@ -1,40 +1,20 @@
-<html><body style="margin:0;background:transparent">
-<!-- Bull Rush app icon: bull mascot on a gold coin over a warm sunburst. Rendered to android/icon.png. -->
-<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
-<defs>
-  <radialGradient id="bg" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#ffcf4a"/><stop offset=".6" stop-color="#ff8a1f"/><stop offset="1" stop-color="#d9480f"/></radialGradient>
-  <radialGradient id="coin" cx=".4" cy=".32" r=".75"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc21a"/><stop offset="1" stop-color="#d98a00"/></radialGradient>
-  <linearGradient id="horn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#e2c697"/></linearGradient>
-  <linearGradient id="arrow" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0fae73"/><stop offset="1" stop-color="#4ff0a8"/></linearGradient>
-  <clipPath id="sq"><rect x="0" y="0" width="192" height="192" rx="44"/></clipPath>
-</defs>
-<g clip-path="url(#sq)">
-  <rect width="192" height="192" fill="url(#bg)"/>
-  <g fill="#fff" opacity=".13" transform="translate(96 84)">
-    <path d="M0 0 L-14 -130 L14 -130Z"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(30)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(60)"/>
-    <path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(90)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(120)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(150)"/>
-    <path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(180)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(210)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(240)"/>
-    <path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(270)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(300)"/><path d="M0 0 L-14 -130 L14 -130Z" transform="rotate(330)"/>
+<!doctype html>
+<!-- Bull Rush app icon: our own flat design (B monogram with horns and a rising arrow). Rendered to art/icon-512.png. -->
+<html><body style="margin:0">
+<svg id="a" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#12324f"/>
+  <g transform="translate(40 52) scale(.84)">
+  <!-- horns -->
+  <path d="M150 150 C 96 140, 70 92, 86 46 C 104 84, 140 104, 196 110 Z" fill="#ffffff"/>
+  <path d="M362 150 C 416 140, 442 92, 426 46 C 408 84, 372 104, 316 110 Z" fill="#ffffff"/>
+  <!-- B monogram -->
+  <path d="M150 112 H 290 C 350 112, 384 146, 384 192 C 384 222, 368 244, 344 256 C 376 268, 396 296, 396 332 C 396 384, 356 420, 296 420 H 150 Z
+           M214 168 V 236 H 282 C 304 236, 318 222, 318 202 C 318 182, 304 168, 282 168 Z
+           M214 290 V 364 H 290 C 314 364, 330 350, 330 327 C 330 304, 314 290, 290 290 Z" fill="#ffffff" fill-rule="evenodd"/>
+  <!-- rising arrow -->
+  <path d="M96 404 L 196 318 L 262 360 L 380 246" fill="none" stroke="#12324f" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 404 L 196 318 L 262 360 L 380 246" fill="none" stroke="#3fbf6a" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M338 228 L 420 206 L 400 288 Z" fill="#3fbf6a" stroke="#12324f" stroke-width="10" stroke-linejoin="round"/>
   </g>
-  <ellipse cx="96" cy="176" rx="64" ry="10" fill="#7a2e05" opacity=".35"/>
-</g>
-<!-- horns -->
-<path d="M44 66 C 16 60, 8 30, 26 12 C 30 34, 46 46, 64 50 Z" fill="url(#horn)" stroke="#4a2c12" stroke-width="5" stroke-linejoin="round"/>
-<path d="M148 66 C 176 60, 184 30, 166 12 C 162 34, 146 46, 128 50 Z" fill="url(#horn)" stroke="#4a2c12" stroke-width="5" stroke-linejoin="round"/>
-<!-- coin -->
-<circle cx="96" cy="100" r="66" fill="#a86c00"/>
-<circle cx="96" cy="96" r="66" fill="url(#coin)" stroke="#a86c00" stroke-width="5"/>
-<circle cx="96" cy="96" r="54" fill="none" stroke="#fff6c8" stroke-width="3.5" stroke-dasharray="7 8" opacity=".85"/>
-<!-- face -->
-<ellipse cx="96" cy="104" rx="42" ry="40" fill="#8a5a2b" stroke="#4a2c12" stroke-width="5"/>
-<ellipse cx="96" cy="126" rx="28" ry="18" fill="#f3b9a0" stroke="#4a2c12" stroke-width="5"/>
-<circle cx="86" cy="126" r="4.5" fill="#4a2c12"/><circle cx="106" cy="126" r="4.5" fill="#4a2c12"/>
-<circle cx="79" cy="94" r="8.5" fill="#fff"/><circle cx="113" cy="94" r="8.5" fill="#fff"/>
-<circle cx="81" cy="95" r="4.5" fill="#1b1400"/><circle cx="115" cy="95" r="4.5" fill="#1b1400"/>
-<circle cx="83" cy="93" r="1.6" fill="#fff"/><circle cx="117" cy="93" r="1.6" fill="#fff"/>
-<path d="M66 80 L88 86 M126 80 L104 86" stroke="#4a2c12" stroke-width="5" stroke-linecap="round"/>
-<!-- rising arrow -->
-<path d="M40 168 L78 132 L98 146 L146 100" fill="none" stroke="#0b5e3f" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M40 168 L78 132 L98 146 L146 100" fill="none" stroke="url(#arrow)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M128 92 L160 86 L154 118 Z" fill="#4ff0a8" stroke="#0b5e3f" stroke-width="4" stroke-linejoin="round"/>
-</svg></body></html>
+</svg>
+</body></html>

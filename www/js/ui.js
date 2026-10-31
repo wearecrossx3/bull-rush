@@ -147,6 +147,12 @@
     };
   }
 
+  function rematchLocal(v) {
+    if (!v.setup) { quitGame(); show('setup'); return; }
+    const st = Object.assign({}, v.setup.settings, { seed: undefined, daily: undefined });
+    begin(LocalCtrl(BR.createGame(st, v.setup.roster), 'me'));
+  }
+
   function startOffline() {
     const me = profile('#in-name');
     const nBots = +$('#pick-bots').dataset.val;
@@ -166,7 +172,7 @@
   }
 
   // ---------------------------------------------------------------- home: profile, stats, settings, tips
-  const prefs = () => Object.assign({ vib: true, speed: 'normal' }, store.get('br.prefs', {}));
+  const prefs = () => Object.assign({ vib: true, speed: 'normal', tips: true }, store.get('br.prefs', {}));
   const SPEEDS = { relaxed: [2.6, 4.6], normal: [1.8, 3.6], fast: [0.7, 1.4] };
   function applyPrefs() { R.botThink = SPEEDS[prefs().speed] || SPEEDS.normal; }
   const stats = () => Object.assign({ played: 0, wins: 0, best: 0, podium: 0 }, store.get('br.stats', {}));
@@ -194,7 +200,70 @@
         <div><small>Games played</small><b>${st.played}</b></div><div><small>Wins</small><b>${st.wins} (${rate}%)</b></div>
         <div><small>Top 3 finishes</small><b>${st.podium}</b></div><div><small>Best net worth</small><b>${rs(st.best)}</b></div>
       </div>
+      ${dailyCard()}
+      <div class="sec-h">ACHIEVEMENTS · ${Object.keys(achGot()).length}/${ACH.length}</div>
+      <div class="ach-grid">${ACH.map((a) => `<div class="ach${achGot()[a.id] ? ' got' : ''}"><span>${a.ic}</span><b>${a.name}</b><small>${a.desc}</small></div>`).join('')}</div>
       <div class="m-foot"><button class="btn red ghosty" data-m="resetstats">Reset stats</button><button class="btn gold" data-m="close">Close</button></div>`, true);
+  }
+
+  // ---------------------------------------------------------------- achievements
+  const ACH = [
+    { id: 'first', ic: '🎮', name: 'First game', desc: 'Finish a game' },
+    { id: 'win', ic: '🏆', name: 'Winner', desc: 'Win a game' },
+    { id: 'l50', ic: '💰', name: 'Half crore', desc: 'Finish with ₹50 lakh' },
+    { id: 'cr', ic: '💎', name: 'Crorepati', desc: 'Finish with ₹1 Cr' },
+    { id: 'owner', ic: '👑', name: 'Owner', desc: 'Own 50,000 shares of a company' },
+    { id: 'tycoon', ic: '🏙', name: 'Tycoon', desc: 'Be owner or co-owner of 3 companies' },
+    { id: 'founder', ic: '🏢', name: 'Founder', desc: 'List your own company' },
+    { id: 'bear', ic: '🐻', name: 'Bear hunter', desc: 'Win money with a Short Sell' },
+    { id: 'clean', ic: '🧘', name: 'Debt free', desc: 'Win with no loan' },
+    { id: 'hard', ic: '🧠', name: 'Big brain', desc: 'Beat hard bots' },
+    { id: 'long', ic: '🏃', name: 'Marathon', desc: 'Finish a 20+ round game' },
+    { id: 'daily', ic: '📅', name: 'Daily hero', desc: 'Beat a daily challenge' },
+    { id: 'vet', ic: '🎖', name: 'Veteran', desc: 'Play 10 games' },
+    { id: 'champ', ic: '🥇', name: 'Champion', desc: 'Win 5 games' },
+  ];
+  const achGot = () => store.get('br.ach', {});
+  function checkAch(v, me, rank, st) {
+    const got = achGot();
+    const cos = v.companies.filter((c) => c.status === 'active');
+    const titles = cos.map((c) => U.ownerOf(v, c)).filter((o) => o && o.p.id === me.id);
+    const worth = U.netWorth(v, me);
+    const hit = {
+      first: true, win: rank === 1, l50: worth >= 5e6, cr: worth >= 1e7,
+      owner: titles.some((o) => o.rank === 'owner'), tycoon: titles.length >= 3, founder: !!me.founded,
+      bear: v.trades.some((t) => t.act === 'short' && t.pid === me.id && t.px > 0),
+      clean: rank === 1 && !me.loan, hard: rank === 1 && v.players.some((p) => p.bot === 'hard'),
+      long: v.round >= 20, daily: !!(v.settings.daily && worth >= v.settings.daily.target),
+      vet: st.played >= 10, champ: st.wins >= 5,
+    };
+    const fresh = ACH.filter((a) => hit[a.id] && !got[a.id]);
+    fresh.forEach((a) => (got[a.id] = Date.now()));
+    store.set('br.ach', got);
+    return fresh;
+  }
+
+  // ---------------------------------------------------------------- daily challenge
+  // Same board, bots and target for everyone on the same date.
+  function today() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+  function dailySpec() {
+    const seed = today();
+    const target = 1200000 + (seed % 5) * 200000;
+    return { seed, target, rounds: 6, bots: 3, skill: seed % 2 ? 'hard' : 'normal' };
+  }
+  function dailyCard() {
+    const d = dailySpec();
+    const done = store.get('br.daily', {})[d.seed];
+    return `<div class="daily${done ? ' done' : ''}"><span class="d-ic">📅</span><div><b>Daily challenge</b><small>Reach ${rs(d.target)} in ${d.rounds} rounds vs ${d.bots} ${d.skill} bots${done ? ' · ✅ beaten today' : ''}</small></div><button class="btn gold" data-m="daily">${done ? 'Play again' : 'Play'}</button></div>`;
+  }
+  function startDaily() {
+    const d = dailySpec();
+    const me = store.get('br.profile', { name: 'Trader', avatar: BR.AVATARS[0] });
+    const roster = [{ id: 'me', name: me.name || 'Trader', avatar: me.avatar, color: BR.COLORS[0] }];
+    for (let i = 0; i < d.bots; i++) roster.push({ id: 'bot' + i, name: BR.BOT_NAMES[(d.seed + i * 3) % BR.BOT_NAMES.length], bot: d.skill, avatar: BR.AVATARS[(d.seed + i * 3 + 1) % BR.AVATARS.length], color: BR.COLORS[(i + 1) % 6] });
+    const s = BR.createGame({ rounds: d.rounds, turns: 3, companies: 8, seed: d.seed, daily: { date: d.seed, target: d.target } }, roster);
+    begin(LocalCtrl(s, 'me'));
+    later(() => banner(`📅 Daily challenge<small>Reach ${rs(d.target)}</small>`, 'gold'), 2000);
   }
   function settingsModal() {
     const p = prefs();
@@ -203,6 +272,7 @@
       <div class="set-row"><span>Sound effects</span><div class="chips"><button class="chip${BR.sound.on ? ' on' : ''}" data-m="snd:on">On</button><button class="chip${BR.sound.on ? '' : ' on'}" data-m="snd:off">Off</button></div></div>
       ${row('Vibration', 'vib', [[true, 'On'], [false, 'Off']])}
       ${row('Bot speed', 'speed', [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['fast', 'Fast']])}
+      ${row('Tips for new players', 'tips', [[true, 'On'], [false, 'Off']])}
       <p class="hint">Bot speed is how long computer players think before each move.</p>
       <div class="m-foot"><button class="btn gold" data-m="close">Done</button></div>`, true);
   }
@@ -228,15 +298,18 @@
     $('#btn-addbot').onclick = () => host.addBot();
     $('#btn-host-start').onclick = () => {
       if (host.roster.length < 2) { toast('Add a bot or wait for a friend', 'err'); return; }
-      host.start({ rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val, companies: +$('#pick-cos-on').dataset.val });
-      begin({
+      const cfg = { rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val, companies: +$('#pick-cos-on').dataset.val };
+      UI.rematch = () => { host.start(cfg); go(); };
+      host.start(cfg);
+      go();
+    };
+    const go = () => begin({
         local: true, online: true, me: 'host',
         view() { return host.game; },
         send(a) { const e = BR.act(host.game, 'host', a); host.flush(true); return e; },
         step(dt) { BR.runBots(host.game, dt); BR.tick(host.game, dt); host.flush(false); },
-        quit() { host.close(); },
+        quit() { host.close(); UI.rematch = null; },
       });
-    };
   }
 
   function joinRoom() {
@@ -253,6 +326,7 @@
       onLobby: renderLobby,
       onStart() {
         started = true;
+        cl.state = null;
         begin({
           online: true, get me() { return cl.id; },
           view() { return cl.state; },
@@ -279,7 +353,7 @@
   let raf = null, last = 0, acc = 0;
   function begin(ctrl) {
     UI.ctrl = ctrl;
-    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = '';
+    UI.phaseKey = ''; UI.renderKey = ''; UI.foundTold = false; UI.statsSaved = false; UI.lastSeat = null; UI.tradeSig = null; UI.prevCash = null; UI.roundSplash = 0; UI.handHtml = ''; UI.reactSeen = {}; UI.reactInit = false; const oc = $('#coach'); if (oc) oc.remove();
     closeModal(true);
     show('game');
     BR.sfx('bell');
@@ -302,6 +376,7 @@
     raf = requestAnimationFrame(loop);
   }
   function quitGame() {
+    const c = $('#coach'); if (c) c.remove();
     if (UI.ctrl && UI.ctrl.quit) UI.ctrl.quit();
     UI.ctrl = null;
     cancelAnimationFrame(raf);
@@ -342,7 +417,68 @@
       if (UI.modal === 'trade') tradeModal(v, me, UI.tradeTk, true);
       if (UI.modal === 'player') playerModal(v, me, UI.playerId, true);
       if (UI.modal === 'reveal') updateWaiting(v, me);
+      reactions(v);
     }
+    coach(v, me);
+  }
+
+  // ---------------------------------------------------------------- reactions
+  function reactions(v) {
+    UI.reactSeen = UI.reactSeen || {};
+    for (const p of v.players) {
+      if (!p.react || UI.reactSeen[p.id] === p.react.n) continue;
+      const first = UI.reactSeen[p.id] === undefined && UI.reactInit;
+      UI.reactSeen[p.id] = p.react.n;
+      if (!UI.reactInit && !first) continue;
+      showReact(p, BR.REACTS[p.react.i]);
+    }
+    UI.reactInit = true;
+  }
+  function showReact(p, txt) {
+    if (UI.modal) { toast(`${p.avatar} ${p.name}: ${txt}`); return; }
+    const seat = document.querySelector(`.seat[data-seat="${CSS.escape(p.id)}"]`);
+    if (!seat) return;
+    const r = seat.getBoundingClientRect();
+    const b = document.createElement('div');
+    b.className = 'react-pop' + (txt.length > 3 ? ' txt' : '');
+    b.textContent = txt;
+    b.style.left = (r.left + Math.min(60, r.width / 3)) + 'px';
+    b.style.top = (r.top + r.height / 2) + 'px';
+    fxLayer().appendChild(b);
+    BR.sfx('notify');
+    setTimeout(() => b.remove(), 2400);
+  }
+  function reactModal() {
+    openModal('react', `<h2>😀 Send a reaction<button class="x" data-m="close">✕</button></h2>
+      <div class="react-grid">${BR.REACTS.map((r, i) => `<button class="btn${r.length > 3 ? ' wide' : ''}" data-m="re:${i}">${r}</button>`).join('')}</div>`, true);
+  }
+
+  // ---------------------------------------------------------------- tips for new players
+  const COACH = {
+    hand: 'These cards at the bottom are your secret price cards. "KAIR +15" means Kairo will rise ₹15 at the reveal. Only you can see them.',
+    turn: 'Your turn! Tap a company to buy or sell shares. You do one thing per turn, or Pass.',
+    gold: 'The shiny ✨ cards are gold cards: special powers. Rivals never see which one you play until the reveal.',
+    news: '📰 Market news! This headline moves a whole sector at the reveal. Use it.',
+    reveal: 'The big reveal: every card is flipped and prices move. Tap "Next round" when you are ready.',
+    bank: 'Need more money? 🏦 Bank lends at 5% per round. Watch out for a margin call if prices crash.',
+  };
+  function coach(v, me) {
+    if (!prefs().tips || $('#coach')) return;
+    const seen = store.get('br.tut', {});
+    let k = null;
+    if (v.phase === 'turns' && !UI.modal && !document.querySelector('.banner')) {
+      if (!seen.hand) k = 'hand';
+      else if (!seen.turn && myTurn(v)) k = 'turn';
+      else if (!seen.news && v.news) k = 'news';
+      else if (!seen.gold && me.gold.length && v.round >= 1 && v.pass >= 1) k = 'gold';
+      else if (!seen.bank && v.round >= 2) k = 'bank';
+    } else if (v.phase === 'reveal' && !seen.reveal && UI.modal === 'reveal') k = 'reveal';
+    if (!k) return;
+    const el = document.createElement('div');
+    el.id = 'coach'; el.className = 'coach';
+    el.innerHTML = `<span class="c-ic">💡</span><p>${COACH[k]}</p><button class="btn gold small">Got it</button>`;
+    el.querySelector('button').onclick = () => { seen[k] = 1; store.set('br.tut', seen); el.remove(); BR.sfx('tap'); };
+    document.body.appendChild(el);
   }
 
   // ---------------------------------------------------------------- table
@@ -416,6 +552,7 @@
     tax: (t) => ({ ic: '🧾', txt: `Paid ${rs(t.px)} tax`, c: 'down' }),
     bonus: (t) => ({ ic: '🎁', txt: `Lucky bonus ${rs(t.px)}`, c: 'up' }),
     net: (t) => ({ ic: '🛟', txt: `Safety Net paid ${rs(t.qty * t.px)}`, c: 'up' }),
+    short: (t) => ({ ic: '🐻', txt: `Short Sell ${t.px >= 0 ? 'won' : 'lost'} ${rs(Math.abs(t.px))} on ${t.tk}`, c: t.px >= 0 ? 'up' : 'down' }),
     pass: () => ({ ic: '✋', txt: 'Passed', c: 'flat' }),
   };
   const verb = (t) => (VERB[t.act] || VERB.pass)(t);
@@ -439,14 +576,15 @@
     const box = $('#actbox');
     if (v.phase !== 'turns') { box.innerHTML = '<div class="act-tip">Round over. Check the reveal!</div>'; return; }
     const passLine = `Turn ${v.pass + 1} of ${v.settings.turns}`;
+    const newsLine = v.news ? `<div class="news-line">📰 ${esc(v.news.text)}</div>` : '';
     const spyBtn = (me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '') + (me.tip ? '<button class="btn small" data-act="tip">🕵️ Tip</button>' : '');
     if (myTurn(v)) {
-      box.innerHTML = `<div class="act-tip"><b>${passLine}</b> · tap a company to buy or sell, or play a ✨ card</div>
+      box.innerHTML = `${newsLine}<div class="act-tip"><b>${passLine}</b> · tap a company to buy or sell, or play a ✨ card</div>
         <div class="act-btns">${spyBtn}${U.canFound(v, me) ? '<button class="btn gold" data-act="found">🏢 My company</button>' : ''}<button class="btn green" data-act="pass">✋ Pass</button></div>`;
     } else {
       const t = v.trades[0];
       const lastLine = t ? `${esc(t.avatar)} ${esc(verb(t).txt)}` : 'Watch what rivals buy and sell...';
-      box.innerHTML = `<div class="act-tip"><b>${passLine}</b> · ${lastLine}</div><div class="act-btns">${spyBtn}</div>`;
+      box.innerHTML = `${newsLine}<div class="act-tip"><b>${passLine}</b> · ${lastLine}</div><div class="act-btns">${spyBtn}</div>`;
     }
     if (UI.wantSpy && me.spy) { UI.wantSpy = false; spyModal(v, me); }
     if (UI.wantTip && me.tip) { UI.wantTip = false; tipModal(v, me); }
@@ -617,6 +755,7 @@
   $('#btn-dash').onclick = () => { const v = view(); if (v) { BR.sfx('tap'); dashModal(v, meP(v)); } };
   $('#btn-log').onclick = () => { const v = view(); if (v) { BR.sfx('tap'); UI.logFilter = 'all'; logModal(v, meP(v)); } };
   $('#btn-menu').onclick = () => { BR.sfx('tap'); menuModal(); };
+  $('#btn-react').onclick = () => { if (view()) { BR.sfx('tap'); reactModal(); } };
 
   // ---------------------------------------------------------------- modals
   function openModal(kind, html, narrow) {
@@ -645,6 +784,10 @@
     else if (k === 'final') finalModal(v, me);
     else if (k === 'quit') quitGame();
     else if (k === 'again') { quitGame(); show('setup'); }
+    else if (k === 'rematch') { if (UI.ctrl.online) { if (UI.rematch) UI.rematch(); } else rematchLocal(v); }
+    else if (k === 'replay') replayModal(v, me);
+    else if (k === 'daily') { closeModal(true); startDaily(); }
+    else if (k.startsWith('re:')) { if (send({ type: 'react', i: +k.slice(3) })) closeModal(true); }
     else if (k === 'howto') { closeModal(true); show('howto'); UI.returnToGame = true; }
     else if (k === 'sound') { BR.sound.toggle(); menuModal(); }
     else if (k === 'b+' || k === 'b-' || k === 'bmax') {
@@ -691,7 +834,7 @@
     } else if (k === 'endgame') { if (send({ type: 'endgame' })) { closeModal(true); banner('🏁 Final round!', 'gold'); } }
     else if (k.startsWith('pref:')) { const [, key, val] = k.split(':'); const p = prefs(); p[key] = val === 'true' ? true : val === 'false' ? false : val; store.set('br.prefs', p); applyPrefs(); settingsModal(); }
     else if (k.startsWith('snd:')) { if (BR.sound.on !== (k === 'snd:on')) BR.sound.toggle(); BR.sfx('tap'); settingsModal(); }
-    else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); statsModal(); renderHome(); }
+    else if (k === 'resetstats') { store.del('br.stats'); store.del('br.best2'); store.del('br.ach'); statsModal(); renderHome(); }
     else if (k.startsWith('fi:')) { UI.foundName = ($('#found-name') || {}).value; UI.foundIssue = +k.slice(3); foundModal(v, me); }
     else if (k === 'found') {
       const name = ($('#found-name') || {}).value || '';
@@ -913,7 +1056,7 @@
     if (v.phase === 'turns') {
       if (UI.modal === 'reveal') closeModal(true);
       if (UI.ctrl.local && !UI.ctrl.online) store.set(SAVE, v);
-      later(() => banner(`<small>ROUND</small>${v.round}<small>${v.ipo ? '🚀 IPO: ' + esc(v.ipo.name) : 'Cards dealt'}</small>`, 'round'), first ? 300 : 50);
+      later(() => banner(`<small>ROUND</small>${v.round}<small>${v.ipo ? '🚀 IPO: ' + esc(v.ipo.name) : v.news ? '📰 ' + esc(v.news.text) : 'Cards dealt'}</small>`, 'round'), first ? 300 : 50);
       BR.sfx('deal');
       const h = $('#hand'); h.classList.add('dealt'); setTimeout(() => h.classList.remove('dealt'), 1000);
     } else if (v.phase === 'reveal') { BR.sfx('bell'); revealModal(v, me, false); }
@@ -999,7 +1142,11 @@
       const st = stats();
       st.played++; if (rank === 1) st.wins++; if (rank <= 3) st.podium++; st.best = Math.max(st.best, mine.worth);
       store.set('br.stats', st);
+      const fresh = checkAch(v, me, rank, st);
+      fresh.forEach((a, i) => later(() => { banner(`${a.ic} Achievement!<small>${a.name}</small>`, 'gold'); BR.sfx('bonus'); }, 1500 + i * 1700));
+      if (v.settings.daily && mine.worth >= v.settings.daily.target) { const d = store.get('br.daily', {}); d[v.settings.daily.date] = 1; store.set('br.daily', d); }
     }
+    const daily = v.settings.daily ? `<div class="daily ${mine.worth >= v.settings.daily.target ? 'done' : ''}"><span class="d-ic">📅</span><div><b>Daily challenge ${mine.worth >= v.settings.daily.target ? 'beaten! ✅' : 'missed'}</b><small>Target ${rs(v.settings.daily.target)} · you made ${rs(mine.worth)}</small></div></div>` : '';
     if (rank === 1) { BR.sfx('fanfare'); confetti(); } else BR.sfx('win');
     const order = [f[1], f[0], f[2]].filter(Boolean);
     const pod = order.map((p) => `<div class="pod p${f.indexOf(p) + 1}"><div class="av">${esc(p.avatar || '🙂')}</div><b>${esc(p.name)}</b><small>${rs(p.worth)}</small><div class="pn">#${f.indexOf(p) + 1}</div></div>`).join('');
@@ -1007,22 +1154,33 @@
     const gain = ((mine.worth / v.settings.startCash) - 1) * 100;
     openModal('final', `
       <h2>${rank === 1 ? '🏆 You won!' : `You finished #${rank}`}<small>${title}</small></h2>
-      <div class="podium">${pod}</div>${rest}
+      <div class="podium">${pod}</div>${rest}${daily}
       <div class="m-grid"><div class="m-box"><h3>YOUR RESULT</h3><div class="macro-big">${rs(mine.worth)} <span class="${cls(Math.round(gain))}">(${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%)</span></div>
       <div class="hint">Best ever: ${rs(Math.max(best, mine.worth))}</div></div>
       <div class="m-box"><h3>WEALTH RACE</h3><canvas id="race2" style="width:100%;height:70px"></canvas></div></div>
-      <div class="m-foot"><button class="btn" data-m="quit">Main menu</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ Keep playing (+5 rounds)</button>' : ''}${UI.ctrl.online ? '' : '<button class="btn gold big" data-m="again">Play again</button>'}</div>`);
+      <div class="m-foot"><button class="btn" data-m="quit">Main menu</button><button class="btn" data-m="replay">📈 Replay</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ +5 rounds</button>' : ''}${!UI.ctrl.online || (isHost(v) && UI.rematch) ? '<button class="btn gold big" data-m="rematch">🔁 Rematch</button>' : ''}</div>`);
     setTimeout(() => {
       const cv = $('#race2');
       if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth })));
     }, 50);
   }
 
+  // the whole game round by round: everyone's net worth line, plus your result each round
+  function replayModal(v, me) {
+    const legend = v.players.map((p) => `<span class="lg"><i style="background:${p.color}"></i>${esc(p.avatar)} ${esc(p.name)}</span>`).join('');
+    const rows = me.worth.slice(1).map((w, i) => { const d = w - me.worth[i]; return `<div class="kv"><span>Round ${i + 1}</span><b>${rs(w)} <small class="${cls(Math.round(d))}">${d >= 0 ? '+' : ''}${rs(d)}</small></b></div>`; }).join('');
+    openModal('replay', `<h2>📈 Game replay<small>Net worth after every round</small></h2>
+      <canvas id="race3" style="width:100%;height:170px"></canvas><div class="legend">${legend}</div>
+      <div class="sec-h">YOUR ROUNDS</div><div class="replay-rows">${rows}</div>
+      <div class="m-foot"><button class="btn gold" data-m="final">◀ Back to results</button></div>`);
+    setTimeout(() => { const cv = $('#race3'); if (cv) BR.worthChart(cv, v.players.map((p) => ({ color: p.color || '#8fa3d6', me: p.id === me.id, pts: p.worth }))); }, 50);
+  }
+
   const isHost = (v) => !!v && v.players[0].id === UI.ctrl.me;
   function menuModal() {
     const v = view();
     const host = isHost(v) && v.phase !== 'ended';
-    const left = v && v.settings.rounds ? `Round ${v.round} of ${v.settings.rounds}` : v ? `Round ${v.round} · no limit` : '';
+    const left = (v && v.settings.rounds ? `Round ${v.round} of ${v.settings.rounds}` : v ? `Round ${v.round} · no limit` : '') + (v && v.settings.daily ? ` · 📅 target ${rs(v.settings.daily.target)}` : '');
     openModal('menu', `<h2>☰ Menu<small>${left}</small><button class="x" data-m="close">✕</button></h2>
       <div class="menu-list">
         <button class="btn gold" data-m="close">▶ Resume</button>
@@ -1078,6 +1236,10 @@
     <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li>
     <li>🐂 Bull Charge: +₹25 · 🎲 Double Trouble: moves ×2 · 🛟 Safety Net: the bank covers your loss on one company</li>
     <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
+    <h4>📰 Market news</h4><p>Most rounds open with a headline. Good news lifts every company in that sector at the reveal, bad news drags them down. "Dividend season" pays every shareholder ₹2 per share.</p>
+    <h4>🐻 Short Sell</h4><p>A gold card that bets on a fall: you earn ₹10,000 for every ₹1 the company drops. If it rises you pay the same, at most ₹2 lakh.</p>
+    <h4>📅 Daily challenge and 🏅 achievements</h4><p>Open 🏆 Stats on the home screen. The daily challenge is the same game for everyone each day: hit the target to beat it. Achievements unlock as you play.</p>
+    <h4>😀 Reactions</h4><p>Tap 😀 at the top during a game to send an emoji or a quick message to the table.</p>
     <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
     <h4>🏢 Your own company</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company.</p>
     <h4>⏱ Game length</h4><p>Pick 6 to 20 rounds or ∞ (no limit). The host can add rounds or call the last round from the ☰ menu, and can keep playing after the final results.</p>
