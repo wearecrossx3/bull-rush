@@ -160,6 +160,13 @@
 <script src="js/net.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/ui.js"></script>
-<script>if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(function () {});</script>
+<script>
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  // check for a new version on every launch and reload once when it takes over
+  var hadSw = !!navigator.serviceWorker.controller, reloaded = false;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (r) { r.update(); }).catch(function () {});
+  navigator.serviceWorker.addEventListener('controllerchange', function () { if (hadSw && !reloaded) { reloaded = true; location.reload(); } });
+}
+</script>
 </body>
 </html>
