@@ -65,7 +65,7 @@
   function show(id) {
     $$('.screen').forEach((s) => { s.classList.toggle('active', s.id === 'scr-' + id); });
     UI.screen = id;
-    if (id === 'title') { startRain(); renderHome(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
+    if (id === 'title') { startRain(); renderHome(); careerSub(); $('#btn-continue').classList.toggle('hidden', !store.get(SAVE, null)); } else stopRain();
   }
   function startRain() {
     if (rainT) return;
@@ -121,6 +121,7 @@
     $('#btn-start').onclick = startOffline;
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
+    $('#btn-career').onclick = () => { BR.sfx('tap'); startCareer(); };
     $('#btn-stats').onclick = () => { BR.sfx('tap'); statsModal(); };
     $('#btn-settings').onclick = () => { BR.sfx('tap'); settingsModal(); };
     applyPrefs();
@@ -241,6 +242,41 @@
     fresh.forEach((a) => (got[a.id] = Date.now()));
     store.set('br.ach', got);
     return fresh;
+  }
+
+  // ---------------------------------------------------------------- career
+  // One long run: you start each game with the money you finished the last one with,
+  // and every game's profit adds to your career total. Bots get tougher as you win.
+  const career = () => Object.assign({ games: 0, wins: 0, total: 0, bank: R.startCash, best: 0 }, store.get('br.career', {}));
+  const careerSkill = (c) => (c.wins >= 6 ? 'hard' : c.wins >= 2 ? 'normal' : 'easy');
+  function careerSub() {
+    const c = career(), el = $('#career-sub');
+    if (el) el.textContent = c.games ? `Game ${c.games + 1} · start with ${rs(c.bank)} · total ${c.total >= 0 ? '+' : '−'}${rs(Math.abs(c.total))}` : 'Your money carries on, game after game';
+  }
+  function startCareer() {
+    const c = career();
+    const me = store.get('br.profile', { name: 'Trader', avatar: BR.AVATARS[0] });
+    const roster = [{ id: 'me', name: me.name || 'Trader', avatar: me.avatar, color: BR.COLORS[0], cash: c.bank }];
+    const names = BR.BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+    const avs = BR.AVATARS.filter((a) => a !== me.avatar).sort(() => Math.random() - 0.5);
+    // rivals start richer as your bank grows, so a big bank is an edge, not a walkover
+    const botCash = Math.max(R.startCash, Math.round(c.bank * 0.7 / 10000) * 10000);
+    for (let i = 0; i < 3; i++) roster.push({ id: 'bot' + i, name: names[i], bot: careerSkill(c), avatar: avs[i], color: BR.COLORS[(i + 1) % 6], cash: botCash });
+    const s = BR.createGame({ rounds: 8, turns: 3, companies: 8, career: { n: c.games + 1, start: c.bank } }, roster);
+    begin(LocalCtrl(s, 'me'));
+    later(() => banner(`💼 Career game ${c.games + 1}<small>You start with ${rs(c.bank)}</small>`, 'gold'), 2000);
+  }
+  // saves the result once per career game (a reload on the results screen will not count it twice)
+  function careerResult(v, mine, rank) {
+    const cg = v.settings.career, c = career();
+    const profit = mine.worth - cg.start;
+    if (c.games < cg.n) {
+      c.games = cg.n; if (rank === 1) c.wins++;
+      c.total += profit; c.best = Math.max(c.best, mine.worth);
+      c.bank = Math.max(R.startCash, Math.round(mine.worth));
+      store.set('br.career', c);
+    }
+    return `<div class="daily car-res${profit >= 0 ? ' done' : ''}"><span class="d-ic">💼</span><div><b>Career · game ${cg.n} · ${profit >= 0 ? '+' : '−'}${rs(Math.abs(profit))}</b><small>Career total ${c.total >= 0 ? '+' : '−'}${rs(Math.abs(c.total))} · ${c.wins} wins · next game starts with ${rs(c.bank)}${mine.worth < R.startCash ? ' (fresh start)' : ''}</small></div></div>`;
   }
 
   // ---------------------------------------------------------------- daily challenge
@@ -431,6 +467,7 @@
       UI.reactSeen[p.id] = p.react.n;
       if (!UI.reactInit && !first) continue;
       showReact(p, BR.REACTS[p.react.i]);
+      if (p.id !== UI.ctrl.me) sayReact(BR.REACTS[p.react.i]);
     }
     UI.reactInit = true;
   }
@@ -448,6 +485,7 @@
     BR.sfx('notify');
     setTimeout(() => b.remove(), 2400);
   }
+  function sayReact(txt) { if (txt && txt.length > 3) BR.speak(txt); }
   function reactModal() {
     openModal('react', `<h2>😀 Send a reaction<button class="x" data-m="close">✕</button></h2>
       <div class="react-grid">${BR.REACTS.map((r, i) => `<button class="btn${r.length > 3 ? ' wide' : ''}" data-m="re:${i}">${r}</button>`).join('')}</div>`, true);
@@ -787,7 +825,8 @@
     else if (k === 'rematch') { if (UI.ctrl.online) { if (UI.rematch) UI.rematch(); } else rematchLocal(v); }
     else if (k === 'replay') replayModal(v, me);
     else if (k === 'daily') { closeModal(true); startDaily(); }
-    else if (k.startsWith('re:')) { if (send({ type: 'react', i: +k.slice(3) })) closeModal(true); }
+    else if (k === 'career') { closeModal(true); quitGame(); startCareer(); }
+    else if (k.startsWith('re:')) { const i = +k.slice(3); if (send({ type: 'react', i })) { sayReact(BR.REACTS[i]); closeModal(true); } }
     else if (k === 'howto') { closeModal(true); show('howto'); UI.returnToGame = true; }
     else if (k === 'sound') { BR.sound.toggle(); menuModal(); }
     else if (k === 'b+' || k === 'b-' || k === 'bmax') {
@@ -1156,7 +1195,7 @@
         <div class="fp-step">${i}</div></div>`;
     const pod = podSpot(f[1], 2) + podSpot(f[0], 1) + podSpot(f[2], 3);
     const rest = f.slice(3).map((p, i) => `<div class="fr-row${p.id === me.id ? ' me' : ''}"><span class="fr-rk">${i + 4}</span><span class="fr-av">${esc(p.avatar)}</span><b>${esc(p.name)}${p.id === me.id ? ' (you)' : ''}</b><span>${rs(p.worth)}</span></div>`).join('');
-    const gain = ((mine.worth / v.settings.startCash) - 1) * 100;
+    const gain = ((mine.worth / me.worth[0]) - 1) * 100;
     const steps = me.worth.slice(1).map((w, i) => ({ r: i + 1, d: w - me.worth[i] }));
     const bestR = steps.slice().sort((a, b) => b.d - a.d)[0];
     const tile = (lab, val, sub, c) => `<div class="fs-tile"><small>${lab}</small><b class="${c || ''}">${val}</b><span>${sub}</span></div>`;
@@ -1164,14 +1203,14 @@
       <div class="fin-head${rank === 1 ? ' win' : ''}"><div class="fin-rank">${rank === 1 ? '🏆' : '#' + rank}</div>
         <div><h2>${rank === 1 ? 'You won!' : `You finished #${rank}`}</h2><span class="fin-title">${title}</span></div></div>
       <div class="fin-pod">${pod}</div>
-      ${rest ? `<div class="fin-rest">${rest}</div>` : ''}${daily}
+      ${rest ? `<div class="fin-rest">${rest}</div>` : ''}${daily}${v.settings.career ? careerResult(v, mine, rank) : ''}
       ${UI.freshAch && UI.freshAch.length ? `<div class="fin-ach"><span>🏅 Unlocked</span>${UI.freshAch.map((a) => `<b>${a.ic} ${a.name}</b>`).join('')}</div>` : ''}
       <div class="fin-stats">
-        ${tile('YOUR NET WORTH', rs(mine.worth), `<span class="${cls(Math.round(gain))}">${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%</span> from ${rs(v.settings.startCash)}`)}
+        ${tile('YOUR NET WORTH', rs(mine.worth), `<span class="${cls(Math.round(gain))}">${gain >= 0 ? '+' : ''}${gain.toFixed(0)}%</span> from ${rs(me.worth[0])}`)}
         ${tile('BEST ROUND', bestR ? (bestR.d >= 0 ? '+' : '') + rs(bestR.d) : '-', bestR ? 'Round ' + bestR.r : '', bestR && bestR.d >= 0 ? 'up' : 'down')}
         ${tile('BEST EVER', rs(Math.max(best, mine.worth)), mine.worth > best ? '🎉 New record!' : 'Your record')}
       </div>
-      <div class="fin-foot"><button class="btn" data-m="quit">🏠 Menu</button><button class="btn" data-m="replay">📈 Replay</button>${isHost(v) ? '<button class="btn" data-m="ext:5">➕ 5 rounds</button>' : ''}${!UI.ctrl.online || (isHost(v) && UI.rematch) ? '<button class="btn gold big" data-m="rematch">🔁 Rematch</button>' : ''}</div>`);
+      <div class="fin-foot"><button class="btn" data-m="quit">🏠 Menu</button><button class="btn" data-m="replay">📈 Replay</button>${isHost(v) && !v.settings.career ? '<button class="btn" data-m="ext:5">➕ 5 rounds</button>' : ''}${v.settings.career ? '<button class="btn gold big" data-m="career">▶ Next game</button>' : !UI.ctrl.online || (isHost(v) && UI.rematch) ? '<button class="btn gold big" data-m="rematch">🔁 Rematch</button>' : ''}</div>`);
   }
 
   // the whole game round by round: everyone's net worth line, plus your result each round
@@ -1257,6 +1296,7 @@
     <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
     <h4>📰 Market news</h4><p>Most rounds open with a headline. Good news lifts every company in that sector at the reveal, bad news drags them down. "Dividend season" pays every shareholder ₹2 per share.</p>
     <h4>🐻 Short Sell</h4><p>A gold card that bets on a fall: you earn ₹10,000 for every ₹1 the company drops. If it rises you pay the same, at most ₹2 lakh.</p>
+    <h4>💼 Career</h4><p>A long run against bots. Each game starts with the money you finished the last one with, and every game's profit adds to your career total. Win more and the bots get tougher. Drop below the starting cash and you get a fresh start.</p>
     <h4>📅 Daily challenge and 🏅 achievements</h4><p>Open 🏆 Stats on the home screen. The daily challenge is the same game for everyone each day: hit the target to beat it. Achievements unlock as you play.</p>
     <h4>😀 Reactions</h4><p>Tap 😀 at the top during a game to send an emoji or a quick message to the table.</p>
     <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>

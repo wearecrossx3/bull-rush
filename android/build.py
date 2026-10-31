@@ -130,6 +130,9 @@ def manifest():
         ("uses-sdk", [A("minSdkVersion", T_DEC, 24), A("targetSdkVersion", T_DEC, 34)]),
         ("uses-permission", [A("name", T_STRING, "android.permission.INTERNET")]),
         ("uses-permission", [A("name", T_STRING, "android.permission.ACCESS_NETWORK_STATE")]),
+        ("queries", [], [  # Android 11+ hides the text-to-speech engine without this
+            ("intent", [], [("action", [A("name", T_STRING, "android.intent.action.TTS_SERVICE")])]),
+        ]),
         ("application", [A("label", T_STRING, LABEL), A("icon", T_REF, ICON_ID),
                          A("theme", T_REF, THEME_FULLSCREEN), A("allowBackup", T_BOOL, -1),
                          A("hardwareAccelerated", T_BOOL, -1)], [

@@ -3,6 +3,8 @@ package com.bullrush.game;
 import android.app.Activity;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
+import android.webkit.JavascriptInterface;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -13,6 +15,16 @@ import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
     private WebView web;
+    private TextToSpeech tts;
+    private boolean ttsReady;
+
+    /** Lets the game speak quick-chat phrases, since Android's WebView has no speechSynthesis. */
+    public class Native {
+        @JavascriptInterface
+        public void speak(String text) {
+            if (ttsReady && text != null) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chat");
+        }
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -33,6 +45,15 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);
         web.setWebViewClient(new WebViewClient());
         web.setWebChromeClient(new WebChromeClient());
+        web.addJavascriptInterface(new Native(), "BRNative");
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override public void onInit(int status) {
+                if (status != TextToSpeech.SUCCESS) return;
+                int r = tts.setLanguage(new java.util.Locale("en", "IN"));
+                if (r < 0) tts.setLanguage(java.util.Locale.US);
+                ttsReady = true;
+            }
+        });
         setContentView(web);
         hideSystemUi();
         if (state != null) web.restoreState(state);
@@ -55,6 +76,12 @@ public class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         web.saveState(out);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tts != null) tts.shutdown();
+        super.onDestroy();
     }
 
     @Override
