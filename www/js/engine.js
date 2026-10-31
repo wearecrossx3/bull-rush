@@ -52,7 +52,7 @@
     return v;
   }
   function netWorth(s, p) { return p.cash + p.fd + holdingsValue(s, p) + (p.ipoBlocked || 0) - p.loan; }
-  function loanLimit(s, p) { return Math.max(0, Math.floor((R.baseCredit + R.loanLtv * (holdingsValue(s, p) + p.fd) - p.loan) / 10000) * 10000); }
+  function loanLimit(s, p) { if (s.settings.loans === false) return 0; return Math.max(0, Math.floor((R.baseCredit + R.loanLtv * (holdingsValue(s, p) + p.fd) - p.loan) / 10000) * 10000); }
   function available(s, c) { return (c.supply || R.supply) - s.players.reduce((a, p) => a + (p.hold[c.tk] || 0), 0); }
   function maxBlocks(s, p, c) {
     if (!live(c)) return 0;
@@ -124,7 +124,8 @@
       cash: r.cash || s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
       ready: false, connected: true, worth: [r.cash || s.settings.startCash], seat: i, lastAct: null, spy: null,
     }));
-    for (const p of s.players) for (let i = 0; i < R.startGold; i++) p.gold.push(goldCard(s, p));
+    const nGold = s.settings.gold != null ? s.settings.gold : R.startGold;
+    for (const p of s.players) for (let i = 0; i < nGold; i++) p.gold.push(goldCard(s, p));
     s.dealer = Math.floor(rnd(s) * s.players.length);
     log(s, 'Welcome to the Bull Rush table! Everyone gets 3 gold cards.', 'sys');
     startRound(s);
@@ -236,7 +237,7 @@
   // most rounds open with a headline; it only uses sectors that are on the board
   function pickNews(s) {
     s.news = null;
-    if (s.round === 1 || rnd(s) > 0.75) return;
+    if (s.settings.news === false || s.round === 1 || rnd(s) > 0.75) return;
     const sectors = new Set(s.companies.filter(live).map((c) => c.sector));
     const pool = BR.NEWS.filter((x) => !x.sector || sectors.has(x.sector));
     const n = pool[Math.floor(rnd(s) * pool.length)];
@@ -375,7 +376,7 @@
 
     // catch-up: players in the bottom half get a fresh gold card
     const ranked = s.players.map((p) => ({ p, w: netWorth(s, p) })).sort((a, b) => b.w - a.w);
-    ranked.slice(Math.ceil(ranked.length / 2)).forEach(({ p }) => {
+    if (s.settings.gold !== 0) ranked.slice(Math.ceil(ranked.length / 2)).forEach(({ p }) => {
       if (p.gold.length < R.maxGold) { p.gold.push(goldCard(s, p)); events.push(`✨ ${p.avatar} ${p.name} gets a bonus gold card for catching up.`); }
     });
 

@@ -121,7 +121,7 @@
       BR.sfx('tap');
       av.dataset.val = b.dataset.v; av.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
     });
-    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days'].forEach((q) => chips($(q)));
+    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days', ...['cash', 'gold', 'loan', 'news'].flatMap((k) => [`#pick-${k}-on`, `#pick-${k}-pp`])].forEach((q) => chips($(q)));
     $('#pick-mode').addEventListener('click', () => setMode($('#pick-mode').dataset.val));
     $('#pick-pp').addEventListener('click', ppNames);
     $('#btn-pass-start').onclick = startPass;
@@ -130,6 +130,7 @@
     $('#btn-start').onclick = startOffline;
     $('#btn-continue').onclick = continueSaved;
     $('#btn-quick').onclick = quickGame;
+    $('#btn-learn').onclick = () => { BR.sfx('tap'); startTutorial(); };
     $('#btn-career').onclick = () => { BR.sfx('tap'); startCareer(); };
     $('#btn-stats').onclick = () => { BR.sfx('tap'); statsModal(); };
     $('#btn-settings').onclick = () => { BR.sfx('tap'); settingsModal(); };
@@ -253,7 +254,159 @@
     return fresh;
   }
 
+  // ---------------------------------------------------------------- learn to play
+  // Welcome slides on the very first open, then a scripted 2-round practice game against a coach.
+  // A spotlight shows exactly what to tap; clicks anywhere else are ignored until the step is done.
+  const SLIDES = [
+    ['🐂', 'Welcome to Bull Rush', 'A stock market party game. Buy low, sell high and finish as the richest trader.'],
+    ['🃏', 'You get secret cards', 'Each round you get price cards like <b class="up">ZENV +15</b> or <b class="down">ORBT −10</b>. They tell you which companies will rise or fall. Only you can see them.'],
+    ['🛒', 'Take turns to trade', 'On your turn, buy companies your cards say will rise and sell the ones that will fall. Or pass.'],
+    ['🎉', 'The big reveal', 'When the round ends, every player\'s cards are flipped and prices move. Your rivals\' cards count too, so watch what they buy!'],
+    ['🏆', 'Richest wins', 'After the last round, cash + shares decide the winner. Gold cards ✨ and the bank 🏦 add twists.'],
+  ];
+  function welcome(force) {
+    if (!force && store.get('br.welcome', 0)) return;
+    if ($('#welcome')) return;
+    let i = 0;
+    const el = document.createElement('div');
+    el.id = 'welcome'; el.className = 'welcome';
+    const draw = () => {
+      const [ic, h, p] = SLIDES[i], last = i === SLIDES.length - 1;
+      el.innerHTML = `<div class="wl-card"><button class="wl-skip" data-w="skip">Skip</button>
+        <div class="wl-ic">${ic}</div><h2>${h}</h2><p>${p}</p>
+        <div class="wl-dots">${SLIDES.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
+        ${last ? '<button class="btn gold big" data-w="learn">🎓 Learn to play (3 min)</button><button class="btn" data-w="skip">I\'ll explore myself</button>'
+          : `<div class="wl-nav">${i ? '<button class="btn" data-w="back">‹ Back</button>' : ''}<button class="btn gold" data-w="next">Next ›</button></div>`}</div>`;
+    };
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-w]'); if (!b) return;
+      BR.sfx('tap');
+      const w = b.dataset.w;
+      if (w === 'next') { i++; draw(); } else if (w === 'back') { i--; draw(); }
+      else { store.set('br.welcome', 1); el.remove(); if (w === 'learn') startTutorial(); }
+    });
+    draw();
+    document.body.appendChild(el);
+  }
+
+  const TUT_DECK = {
+    // [company index on the board, value]; the coach's cards never touch A so the lesson stays clear
+    1: { me: [[0, 15], [0, 10], [1, -10], [2, 5], [3, -5], [4, 5], [5, -5]], coach: [[2, -5], [3, 5], [4, -5], [5, 5], [1, -5], [2, 5], [3, -5]] },
+    2: { me: [[0, -20], [0, -15], [1, 10], [2, 5], [3, -5], [4, 5], [5, 5]], coach: [[2, 5], [3, -5], [4, 5], [5, -5], [1, 5], [2, -5], [3, 5]] },
+  };
+  function TutCtrl(s) {
+    let wait = 0, dealt = 0;
+    const ctrl = {
+      local: true, tut: true, me: 'me', s,
+      view() { return s; },
+      send(a) { const e = BR.act(s, 'me', a); if (a.type === 'ready') BR.act(s, 'coach', a); return e; },
+      step(dt) {
+        if (s.phase === 'turns' && s.round !== dealt) {
+          dealt = s.round;
+          const d = TUT_DECK[s.round] || TUT_DECK[2];
+          const card = (who) => ([ci, v], k) => ({ id: `t${s.round}${who}${k}`, tk: s.companies[ci].tk, v });
+          s.players[0].hand = d.me.map(card('m')); s.players[1].hand = d.coach.map(card('c'));
+          s.market = []; s.news = null; s.ipo = null; s.seat = 0; s.dealer = 0;
+          s.players[0].gold = s.round === 2 ? [{ id: 'tgold', sp: 'LUCKY' }] : [];
+          s.v++;
+        }
+        // the coach always thinks for a moment, then passes
+        if (s.phase === 'turns' && s.players[s.seat].id === 'coach') {
+          wait += dt;
+          if (wait > 1.4) { wait = 0; BR.act(s, 'coach', { type: 'pass' }); UI.tutCoachMoved = true; }
+        } else wait = 0;
+      },
+    };
+    return ctrl;
+  }
+  function startTutorial() {
+    const prof = store.get('br.profile', { name: '', avatar: BR.AVATARS[0] });
+    const roster = [{ id: 'me', name: prof.name || 'You', avatar: prof.avatar, color: BR.COLORS[0] }, { id: 'coach', name: 'Coach Kiran', avatar: '🧑‍🏫', color: BR.COLORS[1] }];
+    const s = BR.createGame({ rounds: 2, turns: 2, companies: 6, seed: 4242, tutorial: true }, roster);
+    s.ipoRounds = []; s.ipoDefs = [];
+    s.players.forEach((p) => { p.gold = []; });
+    UI.tutStep = 0; UI.tutAt = performance.now(); UI.tutCoachMoved = false;
+    begin(TutCtrl(s));
+  }
+  const tA = (v) => v.companies[0], tB = (v) => v.companies[1];
+  const TUT = [
+    { at: '#hand', next: true, say: (v) => `These are your <b>secret price cards</b>. Only you can see them.<br><b class="up">${tA(v).tk} +15</b> means ${esc(tA(v).name)} will go up ₹15 when this round ends.` },
+    { at: (v) => `.deed[data-tile="${tA(v).tk}"]`, say: (v) => `You have two cards for <b>${tA(v).tk}</b>: +15 and +10. That's +₹25 coming! Tap <b>${esc(tA(v).name)}</b> on the board.`, done: () => UI.modal === 'trade' },
+    { at: '#modal-card [data-m="buy"]', allow: '#modal-card', say: () => 'Buy it while it is cheap. Use + to buy more if you like, then tap <b>Buy</b>.', done: (v, me) => (me.hold[tA(v).tk] || 0) > 0 },
+    { say: () => 'Nice buy! 🎉 Now it is <b>Coach Kiran\'s</b> turn. Everyone takes turns around the table.', done: (v) => UI.tutCoachMoved && myTurn(v) && !UI.modal },
+    { at: '[data-act="pass"]', say: (v) => `Your card says <b class="down">${tB(v).tk} −10</b>, so it will fall. You don't own it, so there is nothing to do: tap <b>Pass</b>.`, done: (v) => !myTurn(v) },
+    { say: () => 'Kiran passes too... the round is over. Here comes the <b>big reveal</b>! 🥁', done: () => UI.modal === 'reveal' && !!$('#m-ready') },
+    { at: '#modal-card', next: true, say: (v, me) => `Every player's cards are flipped and prices move. <b>${tA(v).tk}</b> jumped <b class="up">+₹25</b>, and you made <b class="up">${rs((me.hold[tA(v).tk] || 0) * 25)}</b>!` },
+    { at: '#m-ready', say: () => 'Tap here to start round 2.', done: (v) => v.round === 2 && v.phase === 'turns' && !UI.modal },
+    { at: '#hand', next: true, say: (v) => `New round, new cards. Uh-oh: <b class="down">${tA(v).tk} −20</b> and <b class="down">−15</b>. It is going to crash!` },
+    { at: (v) => `.deed[data-tile="${tA(v).tk}"]`, say: (v) => `Get out before the fall. Tap <b>${esc(tA(v).name)}</b>.`, done: () => UI.modal === 'trade' },
+    { at: '#modal-card [data-m="sell"][data-all="1"]', allow: '#modal-card', say: () => 'Tap <b>Sell all</b> to keep your profit safe.', done: (v, me) => !(me.hold[tA(v).tk] || 0) },
+    { say: () => 'Smart! Selling before a crash is how traders win. Kiran\'s turn now...', done: (v) => UI.tutCoachMoved && myTurn(v) && !UI.modal },
+    { at: '#hand .card.sp', say: () => 'This shiny card is a <b>gold card</b> ✨, a special power. Tap it.', done: () => UI.modal === 'special' },
+    { at: '#modal-card [data-m^="sp:"]', allow: '#modal-card', say: () => '<b>Lucky Bonus</b> gives you ₹1 lakh right now. Play it!', done: (v, me) => !me.gold.length },
+    { at: '#btn-bank', next: true, say: () => 'Need more money? The <b>🏦 Bank</b> lends you cash. Try it in a real game.' },
+    { say: () => 'Last reveal coming up...', done: (v) => v.phase === 'ended' && UI.modal === 'reveal' && !!$('[data-m="final"]') },
+    { end: true, say: () => '🎓 <b>You are ready!</b> Buy what your cards say will rise, sell what will fall, and watch your rivals. Rules are always in 📘 Rules.' },
+  ];
+  // one step at a time: move the spotlight, show the speech bubble, advance when the player has done it
+  function tutTick(v) {
+    if (!UI.ctrl || !UI.ctrl.tut) return;
+    const me = meP(v);
+    let st = TUT[UI.tutStep];
+    if (st && st.done && st.done(v, me)) { UI.tutStep++; UI.tutCoachMoved = false; BR.sfx('coin'); st = TUT[UI.tutStep]; }
+    if (!st) return;
+    let box = $('#tut');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'tut'; box.className = 'tut';
+      box.innerHTML = '<div class="tut-ring"></div><div class="tut-bub"><span class="tut-av">🧑‍🏫</span><p></p><div class="tut-btns"></div></div>';
+      document.body.appendChild(box);
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-t]'); if (!b) return;
+        BR.sfx('tap');
+        const t = b.dataset.t;
+        if (t === 'next') { UI.tutStep++; UI.tutCoachMoved = false; }
+        else { endTutorial(); if (t === 'quick') quickGame(); }
+      });
+    }
+    const key = UI.tutStep;
+    if (box.dataset.k !== String(key)) {
+      box.dataset.k = key;
+      box.querySelector('p').innerHTML = st.say(v, me);
+      box.querySelector('.tut-btns').innerHTML = st.end ? '<button class="btn gold" data-t="quick">⚡ Play a Quick Game</button><button class="btn" data-t="home">🏠 Home</button>'
+        : st.next ? '<button class="btn gold small" data-t="next">Next ›</button>' : `<small>Step ${key + 1} of ${TUT.length}</small>`;
+      box.classList.toggle('end', !!st.end);
+    }
+    const sel = typeof st.at === 'function' ? st.at(v) : st.at;
+    const t = sel && $(sel);
+    const ring = box.querySelector('.tut-ring');
+    UI.tutAllow = sel ? [sel, st.allow].filter(Boolean) : null;
+    if (t) {
+      const r = t.getBoundingClientRect(), pad = 6;
+      Object.assign(ring.style, { display: 'block', left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
+      // keep the bubble on the other half of the screen from the target
+      box.classList.toggle('top', r.top + r.height / 2 > innerHeight * 0.55);
+    } else { ring.style.display = 'none'; box.classList.remove('top'); }
+  }
+  function endTutorial() {
+    const b = $('#tut'); if (b) b.remove();
+    store.set('br.tutDone', 1);
+    UI.tutAllow = null;
+    quitGame();
+  }
+  // during a lesson step only the spotlighted control (and the lesson bubble) can be tapped
+  document.addEventListener('click', (e) => {
+    if (!UI.ctrl || !UI.ctrl.tut || !UI.tutAllow) return;
+    if (e.target.closest('#tut, #studio')) return;
+    if (UI.tutAllow.some((q) => e.target.closest(q))) return;
+    e.stopPropagation(); e.preventDefault();
+  }, true);
+
   // ---------------------------------------------------------------- play with friends
+  // the host's house rules: starting money, gold cards, bank loans and news (suffix 'on' = online room, 'pp' = pass & play)
+  function houseRules(sfx) {
+    const val = (k) => $(`#pick-${k}-${sfx}`).dataset.val;
+    return { startCash: +val('cash'), gold: +val('gold'), loans: val('loan') === '1', news: val('news') === '1' };
+  }
   const MODE_HINT = {
     wifi: 'Friends on the same Wi-Fi connect directly for the fastest game.',
     net: 'Friends anywhere can join with their own internet (mobile data works). Share the room code on WhatsApp.',
@@ -303,7 +456,7 @@
       const name = BR.BOT_NAMES.find((n) => !used.includes(n)) || 'Bot'; used.push(name);
       roster.push({ id: 'bot' + i, name, bot: 'normal', avatar: BR.AVATARS[(roster.length * 3 + 1) % BR.AVATARS.length], color: BR.COLORS[roster.length % 6] });
     }
-    const s = BR.createGame({ rounds: +$('#pick-pp-days').dataset.val, turns: 3, companies: 8, pass: { last: null } }, roster);
+    const s = BR.createGame(Object.assign({ rounds: +$('#pick-pp-days').dataset.val, turns: 3, companies: 8, pass: { last: null } }, houseRules('pp')), roster);
     begin(PassCtrl(s));
   }
   // shows the hand-over screen whenever the phone has to go to a different player
@@ -411,7 +564,7 @@
     $('#btn-addbot').onclick = () => host.addBot();
     $('#btn-host-start').onclick = () => {
       if (host.roster.length < 2) { toast('Add a bot or wait for a friend', 'err'); return; }
-      const cfg = { rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val, companies: +$('#pick-cos-on').dataset.val };
+      const cfg = Object.assign({ rounds: +$('#pick-days-on').dataset.val, turnTime: +$('#pick-len-on').dataset.val, companies: +$('#pick-cos-on').dataset.val }, houseRules('on'));
       UI.rematch = () => { host.start(cfg); go(); };
       host.start(cfg);
       go();
@@ -485,12 +638,14 @@
     if (v && (acc > 0.15 || UI.dirty)) {
       acc = 0; UI.dirty = false;
       render(v);
+      tutTick(v);
     }
     raf = requestAnimationFrame(loop);
   }
   function quitGame() {
     const c = $('#coach'); if (c) c.remove();
     $('#pass-cover').classList.add('hidden');
+    const tb = $('#tut'); if (tb) tb.remove();
     if (UI.ctrl && UI.ctrl.quit) UI.ctrl.quit();
     UI.ctrl = null;
     cancelAnimationFrame(raf);
@@ -580,7 +735,7 @@
     bank: 'Need more money? 🏦 Bank lends at 5% per round. Watch out for a margin call if prices crash.',
   };
   function coach(v, me) {
-    if (!prefs().tips || $('#coach')) return;
+    if (!prefs().tips || $('#coach') || UI.ctrl.tut) return;
     const seen = store.get('br.tut', {});
     let k = null;
     if (v.phase === 'turns' && !UI.modal && !document.querySelector('.banner')) {
@@ -590,12 +745,37 @@
       else if (!seen.gold && me.gold.length && v.round >= 1 && v.pass >= 1) k = 'gold';
       else if (!seen.bank && v.round >= 2) k = 'bank';
     } else if (v.phase === 'reveal' && !seen.reveal && UI.modal === 'reveal') k = 'reveal';
-    if (!k) return;
+    if (!k) { smartHint(v, me); return; }
     const el = document.createElement('div');
     el.id = 'coach'; el.className = 'coach';
     el.innerHTML = `<span class="c-ic">💡</span><p>${COACH[k]}</p><button class="btn gold small">Got it</button>`;
     el.querySelector('button').onclick = () => { seen[k] = 1; store.set('br.tut', seen); el.remove(); BR.sfx('tap'); };
     document.body.appendChild(el);
+  }
+
+  // a nudge per turn in the first three real games: what the player's own cards say to do right now
+  function smartHint(v, me) {
+    if (UI.ctrl.online || UI.ctrl.pass || stats().played >= 3 || !myTurn(v) || UI.modal || document.querySelector('.banner')) return;
+    const key = v.round + ':' + v.pass;
+    if (UI.hintKey === key) return;
+    UI.hintKey = key;
+    const net = {};
+    for (const c of me.hand) net[c.tk] = (net[c.tk] || 0) + c.v;
+    const live = (tk) => { const c = U.company(v, tk); return c && c.status === 'active'; };
+    const owned = Object.keys(me.hold).filter((tk) => me.hold[tk] > 0 && live(tk));
+    const fall = owned.filter((tk) => (net[tk] || 0) <= -10).sort((a, b) => net[a] - net[b])[0];
+    const rise = Object.keys(net).filter((tk) => live(tk) && net[tk] >= 15).sort((a, b) => net[b] - net[a])[0];
+    let txt = null;
+    if (fall) txt = `Your cards say <b>${fall}</b> will fall ₹${-net[fall]}, and you own it. Selling before the reveal saves money.`;
+    else if (rise && me.cash >= U.priceOf(U.company(v, rise)) * R.block) txt = `Your cards say <b>${rise}</b> will rise ₹${net[rise]}. Buying it now could pay off at the reveal.`;
+    else if (me.cash > 1500000 && !owned.length) txt = 'You are sitting on a lot of cash. Cash never grows: find a company your cards like.';
+    if (!txt) return;
+    const el = document.createElement('div');
+    el.id = 'coach'; el.className = 'coach hint';
+    el.innerHTML = `<span class="c-ic">🧠</span><p>${txt}</p><button class="btn gold small">OK</button>`;
+    el.querySelector('button').onclick = () => { el.remove(); BR.sfx('tap'); };
+    document.body.appendChild(el);
+    later(() => { if (el.isConnected) el.remove(); }, 9000);
   }
 
   // ---------------------------------------------------------------- table
@@ -1173,7 +1353,7 @@
     UI.phaseKey = key;
     if (v.phase === 'turns') {
       if (UI.modal === 'reveal') closeModal(true);
-      if (UI.ctrl.local && !UI.ctrl.online) store.set(SAVE, v);
+      if (UI.ctrl.local && !UI.ctrl.online && !UI.ctrl.tut) store.set(SAVE, v);
       later(() => banner(`<small>ROUND</small>${v.round}<small>${v.ipo ? '🚀 IPO: ' + esc(v.ipo.name) : v.news ? '📰 ' + esc(v.news.text) : 'Cards dealt'}</small>`, 'round'), first ? 300 : 50);
       BR.sfx('deal');
       const h = $('#hand'); h.classList.add('dealt'); setTimeout(() => h.classList.remove('dealt'), 1000);
@@ -1250,7 +1430,7 @@
   function finalModal(v, me) {
     clearTimers();
     const f = v.final;
-    const pass = !!v.settings.pass;
+    const pass = !!v.settings.pass || !!v.settings.tutorial;
     if (pass) me = v.players.find((p) => p.id === f[0].id) || me;
     const rank = f.findIndex((x) => x.id === me.id) + 1;
     const mine = f[rank - 1];
@@ -1391,5 +1571,5 @@
   show('title');
   const studio = $('#studio');
   studio.addEventListener('click', () => studio.classList.add('skip'));
-  studio.addEventListener('animationend', (e) => { if (e.target === studio) studio.remove(); });
+  studio.addEventListener('animationend', (e) => { if (e.target === studio) { studio.remove(); welcome(); } });
 })(window.BR = window.BR || {});

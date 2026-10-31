@@ -612,3 +612,24 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 @media (orientation: portrait) and (max-height: 700px) { .tip-line { display: none; } }
 @media (orientation: portrait) and (max-height: 700px) { .mascot { width: 92px; } .logo h1 { font-size: 44px; } .title-wrap { gap: 12px; } .mbtn { padding: 7px 14px; } }
 @media (orientation: portrait) and (max-height: 600px) { .mascot { width: 68px; } .logo h1 { font-size: 36px; } .logo .tag { display: none; } .mbtn small { display: none; } .menu-btns { gap: 7px; } .profile-strip { padding: 3px 10px; } }
+
+/* v6.4 learn to play: welcome slides and the guided practice game */
+.welcome { position: fixed; inset: 0; z-index: 90; background: rgba(18, 26, 48, .75); display: grid; place-items: center; padding: 16px; animation: pop .25s; }
+.wl-card { position: relative; background: #fff; border-radius: 24px; padding: 26px 24px 20px; width: min(440px, 100%); max-height: 100%; overflow-y: auto; text-align: center; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); display: flex; flex-direction: column; gap: 10px; }
+.wl-skip { position: absolute; top: 10px; right: 12px; border: 0; background: none; color: var(--muted); font-weight: 800; font-size: 13px; }
+.wl-ic { font-size: 64px; line-height: 1; } .wl-card h2 { margin: 0; font-size: 24px; } .wl-card p { margin: 0; color: #46506a; font-size: 15px; line-height: 1.45; }
+.wl-card b.up, .tut b.up { color: var(--green); } .wl-card b.down, .tut b.down { color: var(--red); }
+.wl-dots { display: flex; justify-content: center; gap: 6px; margin: 4px 0; } .wl-dots i { width: 8px; height: 8px; border-radius: 50%; background: #d8dee9; } .wl-dots i.on { background: var(--gold); width: 22px; border-radius: 4px; }
+.wl-nav { display: flex; gap: 8px; } .wl-nav .btn { flex: 1; }
+.wl-card > .btn { width: 100%; }
+@media (max-height: 430px) { .wl-card { padding: 14px 18px; gap: 6px; } .wl-ic { font-size: 40px; } .wl-card h2 { font-size: 20px; } .wl-card p { font-size: 13px; } }
+.tut { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+.tut-ring { position: fixed; display: none; border-radius: 16px; border: 3px solid #ffb400; box-shadow: 0 0 0 9999px rgba(10, 16, 32, .55), 0 0 18px 4px rgba(255, 180, 0, .8); transition: all .25s ease; animation: tut-pulse 1.4s ease-in-out infinite; }
+@keyframes tut-pulse { 50% { border-color: #fff3c4; } }
+.tut-bub { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(460px, 94vw); background: #fff; border-radius: 18px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; box-shadow: 0 14px 40px rgba(0, 0, 0, .35); border: 2px solid #ffb400; pointer-events: auto; animation: pop .25s; flex-wrap: wrap; }
+.tut.top .tut-bub { bottom: auto; top: 12px; }
+.tut-av { font-size: 30px; line-height: 1; } .tut-bub p { flex: 1; margin: 0; font-size: 14px; line-height: 1.4; font-weight: 600; color: #26304a; min-width: 0; }
+.tut-btns { flex-basis: 100%; display: flex; justify-content: flex-end; gap: 8px; align-items: center; } .tut-btns small { color: var(--muted); font-weight: 800; font-size: 11px; }
+.tut.end { pointer-events: auto; background: rgba(10, 16, 32, .55); } .tut.end .tut-bub { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+@media (max-height: 430px) { .tut-bub { padding: 8px 12px; width: min(560px, 94vw); } .tut-bub p { font-size: 13px; } .tut-av { font-size: 24px; } }
+.hdr-learn { margin-left: auto; }

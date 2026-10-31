@@ -48,7 +48,7 @@
     </div>
   </div>
   <div class="tip-line" id="tip-line"></div>
-  <div class="version">v6.3 · All companies, logos and events are fictional</div>
+  <div class="version">v6.4 · All companies, logos and events are fictional</div>
 </section>
 
 <!-- Offline setup -->
@@ -78,6 +78,11 @@
       <div class="pp-names" id="pp-names"></div>
       <div class="field"><span>Add bots</span><div class="chips" id="pick-pp-bots" data-opts="0,1,2,3" data-val="0"></div></div>
       <div class="field"><span>Rounds</span><div class="chips" id="pick-pp-days" data-opts="6,8,10,15" data-val="8"></div></div>
+      <div class="sec-h custom-h">⚙️ House rules</div>
+      <div class="field"><span>Starting money</span><div class="chips" id="pick-cash-pp" data-opts="200000,500000,1000000,2500000,10000000" data-labels="₹2 L,₹5 L,₹10 L,₹25 L,₹1 Cr" data-val="500000"></div></div>
+      <div class="field"><span>Gold cards each</span><div class="chips" id="pick-gold-pp" data-opts="0,1,3,5" data-labels="None,1,3,5" data-val="3"></div></div>
+      <div class="field"><span>Bank loans</span><div class="chips" id="pick-loan-pp" data-opts="1,0" data-labels="On,Off" data-val="1"></div></div>
+      <div class="field"><span>Market news</span><div class="chips" id="pick-news-pp" data-opts="1,0" data-labels="On,Off" data-val="1"></div></div>
       <button class="btn gold big" id="btn-pass-start">🔔 Start on this phone</button>
       <p class="hint">No internet needed. Everyone plays on this one phone and passes it on when their turn comes, like Ludo. Your cards stay hidden until you tap "show my cards".</p>
     </div>
@@ -104,6 +109,11 @@
         <div class="field"><span>Companies</span><div class="chips" id="pick-cos-on" data-opts="6,8,10,12,0" data-labels="6,8,10,12,🎲 Random" data-val="8"></div></div>
         <div class="field"><span>Rounds</span><div class="chips" id="pick-days-on" data-opts="6,8,10,15,20,0" data-labels="6,8,10,15,20,∞" data-val="8"></div></div>
         <div class="field"><span>Turn timer</span><div class="chips" id="pick-len-on" data-opts="0,20,30,45" data-labels="Off,20s,30s,45s" data-val="30"></div></div>
+        <div class="sec-h custom-h">⚙️ House rules</div>
+        <div class="field"><span>Starting money</span><div class="chips" id="pick-cash-on" data-opts="200000,500000,1000000,2500000,10000000" data-labels="₹2 L,₹5 L,₹10 L,₹25 L,₹1 Cr" data-val="500000"></div></div>
+        <div class="field"><span>Gold cards each</span><div class="chips" id="pick-gold-on" data-opts="0,1,3,5" data-labels="None,1,3,5" data-val="3"></div></div>
+        <div class="field"><span>Bank loans</span><div class="chips" id="pick-loan-on" data-opts="1,0" data-labels="On,Off" data-val="1"></div></div>
+        <div class="field"><span>Market news</span><div class="chips" id="pick-news-on" data-opts="1,0" data-labels="On,Off" data-val="1"></div></div>
         <div class="row"><button class="btn ghost" id="btn-addbot">+ Add bot</button><button class="btn gold" id="btn-host-start">Start game</button></div>
       </div>
       <p class="hint" id="lobby-msg">Waiting for players...</p>
@@ -114,7 +124,7 @@
 <!-- How to play -->
 <section id="scr-howto" class="screen">
   <div class="panel howto">
-    <header><button class="icon-btn" data-go="title">‹</button><h2>How to play</h2></header>
+    <header><button class="icon-btn" data-go="title">‹</button><h2>How to play</h2><button class="btn gold small hdr-learn" id="btn-learn">🎓 Practice game</button></header>
     <div class="howto-body" id="howto-body"></div>
   </div>
 </section>

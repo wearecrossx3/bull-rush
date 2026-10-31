@@ -146,14 +146,15 @@
     let ready = false, relayUp = false, waited = false;
     const up = () => { if (!ready) { ready = true; cb.onReady(self.code); } };
     const check = () => { if (relayUp || (self.peerUp && waited)) up(); };
-    setTimeout(() => { waited = true; check(); if (!ready) setTimeout(() => { if (!ready) cb.onError('Cannot reach the online server. Check your internet.'); }, 7000); }, 8000);
+    setTimeout(() => { waited = true; check(); if (!ready) setTimeout(() => { if (!ready) cb.onError(self.peerErr || 'Cannot reach the online server. Check your internet.'); }, 7000); }, 8000);
     relayHost(this, () => { relayUp = true; check(); });
     try {
       this.peer = new Peer(PREFIX + this.code, opts());
       this.peer.on('open', () => { self.peerUp = true; check(); });
       this.peer.on('error', (e) => {
         if (e.type === 'unavailable-id') { self.peer.destroy(); cb.onError('Room code clash, please try again.'); }
-        else if (!ready && !relayUp) cb.onError(netMsg(e));
+        // other direct-link errors are not fatal: the relay may still carry the room (the 15s timeout reports a real failure)
+        else self.peerErr = netMsg(e);
       });
     } catch (e) { this.peer = null; }
     if (this.peer) this.peer.on('connection', (conn) => {
