@@ -584,3 +584,8 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 /* v6.1 brand-colour logos: hand-card bands use white text so dark brand colours stay readable */
 .card .band { color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, .35); }
 .logo-svg.tile { border-radius: 22%; flex: none; }
+
+/* v6.2 home: app icon instead of the bull coin, warm gold background with a rising line (option H1 + B4) */
+.mascot.appic { border-radius: 24%; filter: none; box-shadow: 0 8px 0 rgba(23, 32, 54, .18), 0 14px 28px rgba(18, 50, 79, .25); }
+#scr-title { background: linear-gradient(135deg, #fff6d8 0%, #ffe08a 55%, #ffc94a 100%); }
+#scr-title::before { inset: 0; animation: none; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 400' preserveAspectRatio='none'><path d='M0 360 L120 320 L200 340 L320 250 L420 280 L540 170 L640 200 L800 60' fill='none' stroke='%23ffffff' stroke-width='10' stroke-linejoin='round' opacity='.6'/><path d='M0 360 L120 320 L200 340 L320 250 L420 280 L540 170 L640 200 L800 60 L800 400 L0 400 Z' fill='%23ffffff' opacity='.25'/></svg>") no-repeat bottom / 100% 100%; }
