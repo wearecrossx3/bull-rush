@@ -76,6 +76,30 @@
     TAX: { name: 'Tax Raid', icon: '🧾', target: false, desc: 'The richest rival pays 5% of their net worth to the bank.' },
     LUCKY: { name: 'Lucky Bonus', icon: '🎁', target: false, desc: 'Collect ₹1 lakh cash right now.' },
     SHORT: { name: 'Short Sell', icon: '🐻', target: true, desc: 'Bet on a fall: earn ₹10,000 for every ₹1 it drops at the reveal. If it rises you pay the same (at most ₹2 lakh).' },
+    MOON: { name: 'Moonshot', icon: '🌙', target: true, desc: 'Company shoots up +₹40 at the reveal.' },
+    BOOM: { name: 'Sector Boom', icon: '🌱', target: true, desc: 'Every company in the same sector rises +₹15 at the reveal.' },
+    SLUMP: { name: 'Sector Slump', icon: '🌧', target: true, desc: 'Every company in the same sector falls −₹15 at the reveal.' },
+    HYPE: { name: 'Viral Hype', icon: '📱', target: true, desc: 'If this company rises this round, the rise is tripled.' },
+    PANIC: { name: 'Panic Wave', icon: '😱', target: true, desc: 'If this company falls this round, the fall is tripled.' },
+    FLIP: { name: 'Mirror Card', icon: '🪞', target: true, desc: 'This company\'s move is flipped: a rise becomes a fall and a fall becomes a rise.' },
+    ANCHOR: { name: 'Anchor', icon: '⚓', target: true, desc: 'Company moves at most ₹5 up or down this round.' },
+    MEGADIV: { name: 'Mega Dividend', icon: '💸', target: true, desc: 'Every holder gets ₹15 per share at the reveal.' },
+    SPLIT: { name: 'Stock Split', icon: '✂️', target: true, desc: 'At the reveal every holder\'s shares double and the price halves.' },
+    LOCK: { name: 'Lockdown', icon: '⛔', target: true, desc: 'Nobody can sell this company until the reveal.' },
+    SWAN: { name: 'Black Swan', icon: '🦢', target: false, desc: 'A random company crashes −₹50 at the reveal. Nobody knows which, not even you!' },
+    STAR: { name: 'Lucky Star', icon: '⭐', target: false, desc: 'A random company jumps +₹50 at the reveal.' },
+    VIP: { name: 'IPO VIP Pass', icon: '🎫', target: false, desc: 'Your IPO application this round is filled in full, even if it is oversubscribed.' },
+    GOLDFD: { name: 'Golden Deposit', icon: '🏦', target: false, desc: 'Your fixed deposit earns an extra 15% at the reveal.' },
+    BUYBACK: { name: 'Buyback', icon: '🔁', target: true, own: true, desc: 'The company buys back all your shares right now at 20% above the price.' },
+    ANGEL: { name: 'Angel Investor', icon: '😇', target: true, desc: 'Get free shares of this company right now (10,000 or more as you get richer).' },
+    JACKPOT: { name: 'Jackpot', icon: '🎰', target: false, desc: 'Win 5% of your net worth in cash right now (at least ₹2.5 lakh).' },
+    FORTUNE: { name: 'Fortune Cookie', icon: '🥠', target: false, desc: 'A surprise cash prize: anything from ₹50,000 up to 8% of your net worth.' },
+    PICK: { name: 'Pickpocket', icon: '🦝', target: false, desc: 'Take 3% of every rival\'s cash right now.' },
+    ROBIN: { name: 'Robin Hood', icon: '🏹', target: false, desc: 'The richest player pays 4% of their net worth, shared by everyone else. Careful if that is you!' },
+    WAIVER: { name: 'Loan Waiver', icon: '🕊', target: false, desc: 'The bank forgives half your loan (up to ₹25 lakh).' },
+    DOUBLEUP: { name: 'Double Up', icon: '✌️', target: false, desc: 'Get 2 new gold cards right now.' },
+    REDRAW: { name: 'Lucky Redraw', icon: '🔄', target: false, desc: 'Swap your 2 worst price cards for 2 random cards from the market.' },
+    CRYSTAL: { name: 'Crystal Ball', icon: '🔮', target: true, desc: 'See every price card for this company this round, in every hand and the market.' },
   };
 
   // Emoji and quick-chat reactions anyone can send at any time.
@@ -106,6 +130,12 @@
     { all: 5, text: 'Foreign investors pour money into the market' },
     { all: -5, text: 'Global markets wobble, investors turn nervous' },
     { dividend: 2, text: 'Dividend season: every company pays ₹2 per share' },
+    { all: 10, text: 'Festival rally! Markets celebrate a record Diwali' },
+    { all: -10, text: 'Flash crash! A big fund dumps shares in panic' },
+    { dividend: 5, text: 'Bumper profits: every company pays ₹5 per share' },
+    { sector: 'IT', d: 15, text: 'AI boom: software orders explode' },
+    { sector: 'BANK', d: -15, text: 'Big loan scandal shakes the banks' },
+    { sector: 'ENER', d: 15, text: 'Huge new oil and gas find announced' },
   ];
 
   BR.RULES = {
@@ -134,5 +164,12 @@
     shortPerRupee: 10000, // Short Sell pays this much per ₹1 fall
     shortMaxLoss: 200000,
     botThink: [1.8, 3.6], // seconds a bot "thinks" before acting
+    // empire: each extra company of your own needs more net worth and a bigger listing fee
+    empire: [{ at: 10000000, fee: 1000000, shares: 30000 }, { at: 50000000, fee: 2500000, shares: 50000 }, { at: 250000000, fee: 10000000, shares: 100000 }],
+    maxCompanies: 16,
+    issueAt: 0.2,         // when less than 20% of a company's shares are left, it issues more
+    issueMax: 2000000,    // ...up to 20 lakh shares in total
+    // net worth titles; reaching one is celebrated and earns a gold card
+    tiers: [{ at: 10000000, name: 'Crorepati', icon: '💼' }, { at: 100000000, name: 'Tycoon', icon: '🏙' }, { at: 1000000000, name: 'Billionaire', icon: '💎' }, { at: 10000000000, name: 'Empire', icon: '👑' }],
   };
 })(window.BR = window.BR || {});

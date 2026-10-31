@@ -26,10 +26,16 @@
         if (x.sp === 'FREEZE') est[t] = 0;
         if (x.sp === 'CHARGE') est[t] += 25;
         if (x.sp === 'DOUBLE') est[t] *= 2;
+        if (x.sp === 'MOON') est[t] += 40;
+        if (x.sp === 'HYPE' && est[t] > 0) est[t] *= 3;
+        if (x.sp === 'PANIC' && est[t] < 0) est[t] *= 3;
+        if (x.sp === 'FLIP') est[t] = -est[t];
+        if (x.sp === 'ANCHOR') est[t] = Math.max(-5, Math.min(5, est[t]));
+        if (x.sp === 'MEGADIV') est[t] += 15;
       }
     }
     if (p.spy) for (const k of p.spy.cards) if (est[k.tk] !== undefined) est[k.tk] += k.v;
-    if (p.tip) for (const k of p.tip) if (est[k.tk] !== undefined) est[k.tk] += k.v;
+    if (p.tip) for (const k of p.tip) if (k.who !== 'You' && est[k.tk] !== undefined) est[k.tk] += k.v;
     // owners know their worst minus cards will be blocked
     for (const t in est) { const o = U.ownerOf(s, U.company(s, t)); if (o && o.p.id === p.id) est[t] += 8 * o.blocks; }
     return est;
@@ -41,32 +47,46 @@
     const gainPct = (tk) => est[tk] / U.company(s, tk).price;
     const lastPass = s.pass === s.settings.turns - 1;
 
+    // 2. play a gold card when one of them helps
+    if (p.gold.length && U.rnd(s) < st.special) {
+      const owned = Object.keys(p.hold).filter((t) => U.company(s, t).status === 'active').sort((a, b) => p.hold[b] - p.hold[a]);
+      const notOwned = Object.keys(est).filter((t) => !p.hold[t] && U.company(s, t).status === 'active').sort((a, b) => est[a] - est[b]);
+      const fall = owned.find((t) => est[t] < -5);
+      const rise = owned.find((t) => est[t] > 0);
+      const richer = s.players.some((o) => o.id !== p.id && U.netWorth(s, o) > U.netWorth(s, p));
+      const mySectors = new Set(owned.map((t) => U.company(s, t).sector));
+      const top = Object.keys(est).filter((t) => U.company(s, t).status === 'active' && U.available(s, U.company(s, t)) >= R.block).sort((a, b) => gainPct(b) - gainPct(a))[0];
+      const use = (sp, tk) => ({ type: 'special', card: sp.id, tk });
+      for (const sp of p.gold) {
+        const k = sp.sp;
+        if ((k === 'RIGHTS' || k === 'DIVIDEND' || k === 'MEGADIV') && owned[0] && est[owned[0]] >= 0) return use(sp, owned[0]);
+        if ((k === 'LOWCAP' || k === 'FREEZE' || k === 'ANCHOR' || k === 'NET' || k === 'FLIP') && fall) return use(sp, fall);
+        if (k === 'BUYBACK' && fall) return use(sp, fall);
+        if (k === 'SHORT' && notOwned[0] && est[notOwned[0]] < -8) return use(sp, notOwned[0]);
+        if ((k === 'PANIC' || k === 'LOCK') && notOwned[0] && est[notOwned[0]] < -5) return use(sp, notOwned[0]);
+        if (k === 'SCAM' && notOwned[0]) return use(sp, notOwned[0]);
+        if (k === 'SLUMP') { const t = notOwned.find((x) => !mySectors.has(U.company(s, x).sector)); if (t) return use(sp, t); }
+        if (k === 'UPCAP') { const t = Object.keys(est).filter((x) => !p.hold[x] && U.company(s, x).status === 'active').sort((a, b) => est[b] - est[a])[0]; if (t) return use(sp, t); }
+        if ((k === 'RUPUP' || k === 'STAR') && owned.length) return use(sp);
+        if ((k === 'RUPDN' || k === 'SWAN') && !owned.length) return use(sp);
+        if ((k === 'SPY' || k === 'TIP' || k === 'REDRAW') && s.pass === 0) return use(sp);
+        if (k === 'CRYSTAL' && s.pass === 0 && (owned[0] || top)) return use(sp, owned[0] || top);
+        if ((k === 'CHARGE' || k === 'DOUBLE' || k === 'MOON' || k === 'HYPE' || k === 'BOOM') && rise) return use(sp, rise);
+        if (k === 'SPLIT' && owned.find((t) => U.company(s, t).price >= 60)) return use(sp, owned.find((t) => U.company(s, t).price >= 60));
+        if (k === 'ANGEL' && top) return use(sp, top);
+        if (k === 'LUCKY' || k === 'JACKPOT' || k === 'FORTUNE' || k === 'PICK') return use(sp);
+        if (k === 'DOUBLEUP' && p.gold.length < R.maxGold) return use(sp);
+        if ((k === 'TAX' || k === 'ROBIN') && richer) return use(sp);
+        if (k === 'WAIVER' && p.loan > 0) return use(sp);
+        if (k === 'GOLDFD' && p.fd > 0) return use(sp);
+        if (k === 'VIP' && s.ipo && s.ipo.founder !== p.id && !p.ipoBlocks) return use(sp);
+      }
+    }
+
     // 1. dump anything that looks like it will fall
     const bad = Object.keys(p.hold).filter((tk) => est[tk] !== undefined && est[tk] < -2 && U.company(s, tk).status === 'active')
       .sort((a, b) => est[a] * p.hold[a] - est[b] * p.hold[b]);
     if (bad.length) return { type: 'sell', tk: bad[0], blocks: p.hold[bad[0]] / R.block };
-
-    // 2. play a special card when it helps
-    const sp = p.gold[0];
-    if (sp && U.rnd(s) < st.special) {
-      const owned = Object.keys(p.hold).filter((t) => U.company(s, t).status === 'active').sort((a, b) => p.hold[b] - p.hold[a]);
-      const notOwned = Object.keys(est).filter((t) => !p.hold[t] && U.company(s, t).status === 'active').sort((a, b) => est[a] - est[b]);
-      const k = sp.sp;
-      const fall = owned.find((t) => est[t] < -5);
-      if ((k === 'RIGHTS' || k === 'DIVIDEND') && owned[0] && est[owned[0]] >= 0) return { type: 'special', card: sp.id, tk: owned[0] };
-      if ((k === 'LOWCAP' || k === 'FREEZE') && fall) return { type: 'special', card: sp.id, tk: fall };
-      if (k === 'SHORT' && notOwned[0] && est[notOwned[0]] < -8) return { type: 'special', card: sp.id, tk: notOwned[0] };
-      if (k === 'SCAM' && notOwned[0]) return { type: 'special', card: sp.id, tk: notOwned[0] };
-      if (k === 'UPCAP') { const t = Object.keys(est).filter((x) => !p.hold[x] && U.company(s, x).status === 'active').sort((a, b) => est[b] - est[a])[0]; if (t) return { type: 'special', card: sp.id, tk: t }; }
-      if (k === 'RUPUP' && owned.length) return { type: 'special', card: sp.id };
-      if (k === 'RUPDN' && !owned.length) return { type: 'special', card: sp.id };
-      if (k === 'SPY' && s.pass === 0) return { type: 'special', card: sp.id };
-      if ((k === 'CHARGE' || k === 'DOUBLE') && owned[0] && est[owned[0]] > 0) return { type: 'special', card: sp.id, tk: owned[0] };
-      if (k === 'NET' && fall) return { type: 'special', card: sp.id, tk: fall };
-      if (k === 'TIP' && s.pass === 0) return { type: 'special', card: sp.id };
-      if (k === 'LUCKY') return { type: 'special', card: sp.id };
-      if (k === 'TAX' && s.players.some((o) => o.id !== p.id && U.netWorth(s, o) > U.netWorth(s, p))) return { type: 'special', card: sp.id };
-    }
 
     // 2b. rich bots list their own company
     if (p.bot !== 'easy' && U.canFound(s, p)) return { type: 'found', name: `${p.name.split(' ')[0]} ${U.pick(s, ['Ventures', 'Industries', 'Labs', 'Capital', 'Motors'])}`, issue: 50 };

@@ -109,20 +109,16 @@
     s.settings.companies = nCo;
     const starts = nCo === 8 ? BR.START_PRICES : Array.from({ length: nCo }, (_, i) => Math.round((20 + (90 * i) / Math.max(1, nCo - 1)) / 5) * 5);
     s.companies = starts.map((start, i) => newCompany(s, Object.assign({ start }, pool[i]), i));
-    s.ipoCap = Math.min(14, nCo + 4);
+    s.ipoCap = R.maxCompanies;
     s.ipoDefs = pool.slice(nCo).map((d, i) => Object.assign({ start: BR.IPO_PRICES[i % BR.IPO_PRICES.length] }, d));
     s.ipoRounds = [];
     const n = s.settings.rounds;
-    if (n && n <= 10) {
-      for (const f of [0.3, 0.55, 0.8]) {
-        const r = Math.max(2, Math.round(n * f));
-        if (r < n && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
-      }
-    } else scheduleIpos(s);
+    if (n && n <= 10) { for (let r = 2; r < n; r += 2) s.ipoRounds.push(r); } else scheduleIpos(s);
     s.players = roster.map((r, i) => ({
       id: r.id, name: r.name, bot: r.bot || null, color: r.color || BR.COLORS[i % 6], avatar: r.avatar || BR.AVATARS[i],
       cash: r.cash || s.settings.startCash, hold: {}, cost: {}, loan: 0, fd: 0, hand: [], gold: [], ipoBlocks: 0, ipoBlocked: 0,
       ready: false, connected: true, worth: [r.cash || s.settings.startCash], seat: i, lastAct: null, spy: null,
+      tier: R.tiers.filter((x) => (r.cash || s.settings.startCash) >= x.at).length,
     }));
     const nGold = s.settings.gold != null ? s.settings.gold : R.startGold;
     for (const p of s.players) for (let i = 0; i < nGold; i++) p.gold.push(goldCard(s, p));
@@ -132,11 +128,11 @@
     return s;
   };
 
-  // Long and endless games get an IPO every 4 rounds (rounds: 0 means no limit).
+  // Long and endless games get an IPO every 3 rounds (rounds: 0 means no limit).
   function scheduleIpos(s) {
     const n = s.settings.rounds;
     const until = n || s.round + 40;
-    for (let r = 3; r < until || (!n && r <= until); r += 4) if (r > s.round && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
+    for (let r = 3; r < until || (!n && r <= until); r += 3) if (r > s.round && !s.ipoRounds.includes(r)) s.ipoRounds.push(r);
   }
   const lastRound = (s) => !!s.settings.rounds && s.round >= s.settings.rounds;
 
@@ -194,18 +190,28 @@
       }
     }
 
+    for (const c of s.companies) {
+      if (!live(c)) continue;
+      const sup = c.supply || s.settings.supply || R.supply;
+      if (available(s, c) < sup * R.issueAt && sup < R.issueMax) {
+        const add = Math.min(R.issueMax - sup, Math.max(R.supply, Math.round(sup * 0.5 / R.supply) * R.supply));
+        c.supply = sup + add;
+        log(s, `📈 ${c.name} issues ${fmt(add)} new shares. More to buy!`, 'corp');
+      }
+    }
+
     s.ipo = null;
     let def = null;
     if (s.foundQueue && s.foundQueue.length) {
       // a player's own company jumps the queue; a scheduled IPO waits a round
       def = s.foundQueue.shift();
       s.ipoRounds = s.ipoRounds.map((r) => (r === s.round ? r + 1 : r));
-    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length && s.companies.filter((c) => !c.founder).length < (s.ipoCap || 12)) def = s.ipoDefs.shift();
+    } else if (s.ipoRounds.includes(s.round) && s.ipoDefs.length && s.companies.length < (s.ipoCap || R.maxCompanies)) def = s.ipoDefs.shift();
     if (!s.settings.rounds && !s.ipoRounds.some((r) => r > s.round)) scheduleIpos(s);
     if (def) {
       const c = newCompany(s, def, s.companies.length);
       c.status = 'ipo'; c.issue = def.start; c.history = [];
-      if (def.founder) c.founder = def.founder;
+      if (def.founder) { c.founder = def.founder; c.founderShares = def.shares; c.listingFee = def.fee; }
       s.companies.push(c);
       s.ipo = { tk: c.tk, name: c.name, issue: def.start, blocks: Math.max(6, s.players.length * 4), pitch: def.pitch, founder: def.founder || null };
       log(s, `🚀 IPO! ${c.name} opens at ₹${def.start}/share. Apply on your turn this round.`, 'ipo');
@@ -222,7 +228,7 @@
       p.hand = hands[i];
       p.ipoBlocks = 0;
       p.spy = null;
-      p.tip = null;
+      p.tip = null; p.tipKind = null;
       p.ready = !!p.bot;
     });
     s.market = rest;
@@ -266,12 +272,14 @@
 
     if (s.ipo) {
       const c = company(s, s.ipo.tk);
+      const vip = new Set(s.plays.filter((x) => x.sp === 'VIP').map((x) => x.pid));
       const want = s.players.reduce((a, p) => a + p.ipoBlocks, 0);
-      const ratio = want > s.ipo.blocks ? s.ipo.blocks / want : 1;
+      const vipWant = s.players.reduce((a, p) => a + (vip.has(p.id) ? p.ipoBlocks : 0), 0);
+      const ratio = want > s.ipo.blocks ? Math.max(0, s.ipo.blocks - vipWant) / Math.max(1, want - vipWant) : 1;
       for (const p of s.players) {
         if (!p.ipoBlocks) continue;
-        let got = Math.floor(p.ipoBlocks * ratio);
-        if (rnd(s) < p.ipoBlocks * ratio - got) got++;
+        let got = vip.has(p.id) ? p.ipoBlocks : Math.floor(p.ipoBlocks * ratio);
+        if (!vip.has(p.id) && rnd(s) < p.ipoBlocks * ratio - got) got++;
         const shares = got * R.block;
         p.cash += p.ipoBlocked - shares * c.issue;
         p.ipoBlocked = 0;
@@ -282,15 +290,19 @@
       const founder = c.founder && player(s, c.founder);
       if (founder) {
         const sold = s.players.reduce((a, p) => a + (p.id === founder.id ? 0 : p.hold[c.tk] || 0), 0);
-        founder.hold[c.tk] = (founder.hold[c.tk] || 0) + R.founderShares;
-        addCost(founder, c.tk, R.listingFee);
+        const fs = c.founderShares || R.founderShares;
+        founder.hold[c.tk] = (founder.hold[c.tk] || 0) + fs;
+        addCost(founder, c.tk, c.listingFee || R.listingFee);
         if (sold) { founder.cash += sold * c.issue; trade(s, founder, 'raise', c.tk, sold, c.issue, 'IPO money'); }
-        events.push(`🏢 ${founder.avatar} ${founder.name} listed ${c.name}, kept ${fmt(R.founderShares)} founder shares and raised ₹${fmt(sold * c.issue)}.`);
+        events.push(`🏢 ${founder.avatar} ${founder.name} listed ${c.name}, kept ${fmt(fs)} founder shares and raised ₹${fmt(sold * c.issue)}.`);
       }
       if (want > s.ipo.blocks) events.push(`${c.name} IPO was oversubscribed ${(want / s.ipo.blocks).toFixed(1)}x!`);
       c.status = 'active'; c.price = c.issue; c.history = [c.issue];
     }
 
+    for (const x of s.plays) {
+      if ((x.sp === 'SWAN' || x.sp === 'STAR') && !x.tk) { const pool = s.companies.filter(live); if (pool.length) x.tk = pick(s, pool).tk; }
+    }
     const rupee = s.plays.filter((x) => x.sp === 'RUPUP').length - s.plays.filter((x) => x.sp === 'RUPDN').length;
     for (const c of s.companies) {
       if (!live(c)) continue;
@@ -309,9 +321,21 @@
       if (on('DOUBLE') && total) { total *= 2; mods.push('🎲 ×2'); }
       if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
       if (on('CHARGE')) { total += 25; mods.push('🐂 +25'); }
+      if (on('MOON')) { total += 40; mods.push('🌙 +40'); }
+      if (on('STAR')) { total += 50; mods.push('⭐ +50'); }
+      if (on('SWAN')) { total -= 50; mods.push('🦢 −50'); }
+      for (const x of s.plays) {
+        if ((x.sp !== 'BOOM' && x.sp !== 'SLUMP') || !x.tk) continue;
+        const t = company(s, x.tk);
+        if (t && t.sector === c.sector) { total += x.sp === 'BOOM' ? 15 : -15; mods.push(x.sp === 'BOOM' ? '🌱 +15' : '🌧 −15'); }
+      }
       if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
       const nd = newsMove(s, c);
       if (nd) { total += nd; mods.push(`📰 ${nd > 0 ? '+' : ''}${nd}`); }
+      if (on('HYPE') && total > 0) { total *= 3; mods.push('📱 ×3'); }
+      if (on('PANIC') && total < 0) { total *= 3; mods.push('😱 ×3'); }
+      if (on('FLIP') && total) { total = -total; mods.push('🪞 flipped'); }
+      if (on('ANCHOR')) { const t = clamp(total, -5, 5); if (t !== total) { total = t; mods.push('⚓ max ±5'); } }
       if (on('UPCAP') && total > 15) { total = 15; mods.push('🚧 max +15'); }
       if (on('LOWCAP') && total < -15) { total = -15; mods.push('🪂 max −15'); }
       if (on('FREEZE')) { total = 0; mods.push('🔒 frozen'); }
@@ -319,7 +343,7 @@
       let to = Math.max(0, from + total);
       const row = { tk: c.tk, name: c.name, color: c.color, mark: c.mark, from, to, total, cards, mods, note: '' };
 
-      const div = (on('DIVIDEND') ? R.dividend : 0) + (s.news && s.news.dividend || 0);
+      const div = (on('DIVIDEND') ? R.dividend : 0) + (on('MEGADIV') ? 15 : 0) + (s.news && s.news.dividend || 0);
       if (div) {
         for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * div; trade(s, p, 'div', c.tk, p.hold[c.tk], div); }
         row.note = `💰 Dividend ₹${div}/share paid`;
@@ -360,6 +384,11 @@
         to = Math.round(to / 2);
         row.note = '🎉 1:1 BONUS! Shares doubled, price halved';
         log(s, `${c.name} hit ₹${R.splitAt}: bonus issue, shares doubled!`, 'up');
+      } else if (on('SPLIT') && to >= 10) {
+        for (const p of s.players) if (p.hold[c.tk]) p.hold[c.tk] *= 2;
+        c.supply = (c.supply || R.supply) * 2;
+        to = Math.round(to / 2);
+        row.note = '✂️ STOCK SPLIT! Shares doubled, price halved';
       }
       c.price = to; c.last = to - from;
       c.history.push(to);
@@ -370,8 +399,14 @@
     // bank: deposits earn, loans cost, and too much debt triggers a margin call
     for (const p of s.players) {
       if (p.fd > 0) { const i = Math.round(p.fd * R.fdRate); p.fd += i; }
+      if (p.fd > 0 && s.plays.some((x) => x.sp === 'GOLDFD' && x.pid === p.id)) { const g = Math.round(p.fd * 0.15); p.fd += g; events.push(`🏦 ${p.avatar} ${p.name}'s Golden Deposit earned ₹${fmt(g)}.`); }
       if (p.loan > 0) { const i = Math.round(p.loan * R.loanRate); p.loan += i; }
       marginCall(s, p, events);
+    }
+
+    for (const x of s.plays) {
+      const d = BR.SPECIALS[x.sp];
+      if (d) events.push(`${d.icon} ${x.who} played ${d.name}${x.tk ? ' on ' + x.tk : ''}${x.note ? ' · ' + x.note : ''}`);
     }
 
     // catch-up: players in the bottom half get a fresh gold card
@@ -380,10 +415,19 @@
       if (p.gold.length < R.maxGold) { p.gold.push(goldCard(s, p)); events.push(`✨ ${p.avatar} ${p.name} gets a bonus gold card for catching up.`); }
     });
 
-    const pl = {}, cash = {};
+    const pl = {}, cash = {}, titles = [];
     for (const p of s.players) {
       const w = netWorth(s, p);
       p.worth.push(w);
+      const t = R.tiers.filter((x) => w >= x.at).length;
+      if (t > (p.tier || 0)) {
+        p.tier = t;
+        const x = R.tiers[t - 1];
+        titles.push({ pid: p.id, name: x.name, icon: x.icon });
+        events.push(`${x.icon} ${p.avatar} ${p.name} is now a ${x.name}!${s.settings.gold !== 0 && p.gold.length < R.maxGold ? ' Bonus gold card.' : ''}`);
+        if (s.settings.gold !== 0 && p.gold.length < R.maxGold) p.gold.push(goldCard(s, p));
+        log(s, `${x.icon} ${p.name} is now a ${x.name}!`, 'up');
+      }
       pl[p.id] = w - before[p.id];
       cash[p.id] = p.cash - cashBefore[p.id];
     }
@@ -395,7 +439,7 @@
       s.reactN = (s.reactN || 0) + 1;
       p.react = { i: opts[Math.floor(rnd(s) * opts.length)], n: s.reactN };
     }
-    s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice() };
+    s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice(), titles };
     log(s, `Round ${s.round} revealed! Biggest mover: ${rows[0] ? rows[0].name : '-'}.`, 'sys');
 
     if (lastRound(s)) endGame(s);
@@ -467,6 +511,7 @@
       if (!c || !live(c)) return 'That company is not trading';
       const q = b * R.block;
       if (!(b > 0) || q > (p.hold[c.tk] || 0)) return 'You do not have that many shares';
+      if (s.plays.some((x) => x.sp === 'LOCK' && x.tk === c.tk)) return `⛔ ${c.tk} is in lockdown until the reveal`;
       const had = p.hold[c.tk];
       p.cash += q * c.price;
       p.hold[c.tk] -= q;
@@ -509,7 +554,7 @@
         p.spy = { who: o.name, avatar: o.avatar, cards: o.hand.map((x) => Object.assign({}, x)) };
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else if (k.sp === 'TIP') {
-        p.tip = s.market.map((x) => Object.assign({}, x));
+        p.tip = s.market.map((x) => Object.assign({}, x)); p.tipKind = 'tip';
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else if (k.sp === 'TAX') {
         const rich = s.players.filter((o) => o.id !== p.id).sort((a, b) => netWorth(s, b) - netWorth(s, a))[0];
@@ -520,27 +565,36 @@
       } else if (k.sp === 'LUCKY') {
         p.cash += 100000;
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
+      } else if (INSTANT[k.sp]) {
+        const r = INSTANT[k.sp](s, p, c);
+        if (typeof r === 'string') return r;
+        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true, done: true, note: r && r.note, card: k.id });
+        trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       } else {
         // every gold card stays hidden from rivals until the reveal, so nobody can react to it in time
-        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true });
+        s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true, card: k.id });
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       }
+      if (!s.plays.some((x) => x.card === k.id)) s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true, done: true, card: k.id });
       log(s, `🤫 ${p.name} played a secret card. Find out at the reveal!`, 'corp');
       p.gold.splice(i, 1);
       return 'turn';
     },
     found(s, p, a) {
-      if (p.founded) return 'You already have your own company';
-      if (netWorth(s, p) < R.founderAt) return `Reach ₹${fmt(R.founderAt)} net worth first`;
-      if (p.cash < R.listingFee) return `Listing costs ₹${fmt(R.listingFee)} in cash`;
+      const e = nextEmpire(p);
+      if (!e) return 'Your empire is complete: you already own 3 companies';
+      if (s.companies.length + (s.foundQueue || []).length >= R.maxCompanies) return 'The board is full';
+      if (netWorth(s, p) < e.at) return `Reach ₹${fmt(e.at)} net worth first`;
+      if (p.cash < e.fee) return `Listing costs ₹${fmt(e.fee)} in cash`;
       if (lastRound(s)) return 'No rounds left to list a company';
       const name = String(a.name || '').replace(/[^A-Za-z0-9 &.'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18) || `${p.name.split(' ')[0]} Ventures`;
       const issue = R.founderIssue.includes(+a.issue) ? +a.issue : R.founderIssue[1];
       const tk = ticker(s, name);
-      p.cash -= R.listingFee;
+      p.cash -= e.fee;
       p.founded = tk;
-      (s.foundQueue = s.foundQueue || []).push({ tk, name, sector: 'OWN', pitch: `Founded by ${p.name}`, start: issue, founder: p.id });
-      trade(s, p, 'found', tk, 0, R.listingFee, name);
+      (p.founds = p.founds || []).push(tk);
+      (s.foundQueue = s.foundQueue || []).push({ tk, name, sector: 'OWN', pitch: `Founded by ${p.name}`, start: issue, founder: p.id, shares: e.shares, fee: e.fee });
+      trade(s, p, 'found', tk, 0, e.fee, name);
       log(s, `🏢 ${p.avatar} ${p.name} founded ${name}! Its IPO opens next round at ₹${issue}.`, 'ipo');
       return 'turn';
     },
@@ -610,7 +664,81 @@
     for (let i = 2; taken.has(base); i++) base = base.slice(0, 3) + i;
     return base;
   }
-  function canFound(s, p) { return !p.founded && s.phase === 'turns' && !lastRound(s) && netWorth(s, p) >= R.founderAt && p.cash >= R.listingFee; }
+  // the next company a player may found (null once they own three)
+  function nextEmpire(p) { return R.empire[(p.founds || (p.founded ? [p.founded] : [])).length] || null; }
+  function canFound(s, p) {
+    const e = nextEmpire(p);
+    return !!e && s.phase === 'turns' && !lastRound(s) && s.companies.length + (s.foundQueue || []).length < R.maxCompanies && netWorth(s, p) >= e.at && p.cash >= e.fee;
+  }
+
+  // gold cards that act the moment they are played (their effect is announced at the reveal)
+  const pct = (x, f, min) => Math.max(min, Math.round(x * f / 1000) * 1000);
+  const INSTANT = {
+    BUYBACK(s, p, c) {
+      const q = p.hold[c.tk] || 0;
+      if (!q) return 'You must own that company';
+      const px = Math.round(c.price * 1.2);
+      p.cash += q * px; delete p.hold[c.tk]; shrinkCost(p, c.tk, q);
+      return { note: `${fmt(q)} shares at ₹${px}` };
+    },
+    ANGEL(s, p, c) {
+      let q = Math.max(10000, Math.floor(netWorth(s, p) * 0.03 / Math.max(1, c.price) / R.block) * R.block);
+      q = Math.min(q, Math.floor(available(s, c) / R.block) * R.block);
+      if (!q) return `No ${c.tk} shares left`;
+      p.hold[c.tk] = (p.hold[c.tk] || 0) + q;
+      if (!p.cost) p.cost = {};
+      p.cost[c.tk] = p.cost[c.tk] || 0;
+      return { note: `${fmt(q)} free shares` };
+    },
+    JACKPOT(s, p) { const amt = pct(netWorth(s, p), 0.05, 250000); p.cash += amt; return { note: `+₹${fmt(amt)}` }; },
+    FORTUNE(s, p) {
+      const top = Math.max(50000, netWorth(s, p) * 0.08);
+      const amt = Math.round((50000 + rnd(s) * (top - 50000)) / 1000) * 1000;
+      p.cash += amt;
+      return { note: `+₹${fmt(amt)}` };
+    },
+    PICK(s, p) {
+      let got = 0;
+      for (const o of s.players) { if (o.id === p.id) continue; const t = Math.round(o.cash * 0.03 / 1000) * 1000; o.cash -= t; got += t; }
+      p.cash += got;
+      return { note: `took ₹${fmt(got)}` };
+    },
+    ROBIN(s, p) {
+      const rich = s.players.slice().sort((a, b) => netWorth(s, b) - netWorth(s, a))[0];
+      const amt = Math.min(rich.cash, pct(netWorth(s, rich), 0.04, 0));
+      const others = s.players.filter((o) => o.id !== rich.id);
+      const each = Math.floor(amt / others.length / 1000) * 1000;
+      rich.cash -= each * others.length;
+      for (const o of others) o.cash += each;
+      return { note: `${rich.name} paid ₹${fmt(each * others.length)}` };
+    },
+    WAIVER(s, p) {
+      if (!p.loan) return 'You have no loan to forgive';
+      const amt = Math.min(2500000, Math.round(p.loan / 2));
+      p.loan -= amt;
+      return { note: `₹${fmt(amt)} forgiven` };
+    },
+    DOUBLEUP(s, p) { for (let i = 0; i < 2 && p.gold.length <= R.maxGold; i++) p.gold.push(goldCard(s, p)); return {}; },
+    REDRAW(s, p) {
+      if (!s.market.length) return 'The market has no spare cards';
+      const worst = p.hand.slice().sort((a, b) => a.v - b.v).slice(0, 2);
+      for (const k of worst) {
+        if (!s.market.length) break;
+        const j = Math.floor(rnd(s) * s.market.length);
+        const n = s.market.splice(j, 1, k)[0];
+        p.hand.splice(p.hand.indexOf(k), 1, n);
+      }
+      p.hand.sort((a, b) => a.tk.localeCompare(b.tk) || b.v - a.v);
+      return {};
+    },
+    CRYSTAL(s, p, c) {
+      const all = [];
+      for (const o of s.players) for (const k of o.hand) if (k.tk === c.tk) all.push(Object.assign({ who: o.id === p.id ? 'You' : o.name }, k));
+      for (const k of s.market) if (k.tk === c.tk) all.push(Object.assign({ who: 'Market' }, k));
+      p.tip = all; p.tipKind = 'crystal';
+      return {};
+    },
+  };
 
   BR.act = function (s, pid, a) {
     const p = player(s, pid);
@@ -662,5 +790,5 @@
     return v;
   };
 
-  BR.util = { newsMove, canFound, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
+  BR.util = { newsMove, canFound, nextEmpire, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
 })(window.BR = window.BR || {});

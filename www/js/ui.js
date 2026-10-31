@@ -121,7 +121,7 @@
       BR.sfx('tap');
       av.dataset.val = b.dataset.v; av.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
     });
-    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days', ...['cash', 'gold', 'sup', 'loan', 'news'].flatMap((k) => [`#pick-${k}-on`, `#pick-${k}-pp`])].forEach((q) => chips($(q)));
+    ['#pick-bots', '#pick-skill', '#pick-cos', '#pick-sup', '#pick-days', '#pick-len', '#pick-cos-on', '#pick-days-on', '#pick-len-on', '#pick-mode', '#pick-pp', '#pick-pp-bots', '#pick-pp-days', ...['cash', 'gold', 'sup', 'loan', 'news'].flatMap((k) => [`#pick-${k}-on`, `#pick-${k}-pp`])].forEach((q) => chips($(q)));
     $('#pick-mode').addEventListener('click', () => setMode($('#pick-mode').dataset.val));
     $('#pick-pp').addEventListener('click', ppNames);
     $('#btn-pass-start').onclick = startPass;
@@ -172,7 +172,7 @@
     const names = BR.BOT_NAMES.slice().sort(() => Math.random() - 0.5);
     const avs = BR.AVATARS.filter((a) => a !== me.avatar).sort(() => Math.random() - 0.5);
     for (let i = 0; i < nBots; i++) roster.push({ id: 'bot' + i, name: names[i], bot: skill, avatar: avs[i], color: BR.COLORS[(i + 1) % 6] });
-    const s = BR.createGame({ rounds: +$('#pick-days').dataset.val, turns: +$('#pick-len').dataset.val, companies: +$('#pick-cos').dataset.val }, roster);
+    const s = BR.createGame({ rounds: +$('#pick-days').dataset.val, turns: +$('#pick-len').dataset.val, companies: +$('#pick-cos').dataset.val, supply: +$('#pick-sup').dataset.val }, roster);
     begin(LocalCtrl(s, 'me'));
   }
 
@@ -479,6 +479,12 @@
   // and every game's profit adds to your career total. Bots get tougher as you win.
   const career = () => Object.assign({ games: 0, wins: 0, total: 0, bank: R.startCash, best: 0 }, store.get('br.career', {}));
   const careerSkill = (c) => (c.wins >= 6 ? 'hard' : c.wins >= 2 ? 'normal' : 'easy');
+  const careerLevel = (c) => ({
+    rivals: Math.min(5, 2 + Math.floor((c.games + 1) / 2)),
+    companies: Math.min(12, 6 + c.games),
+    rounds: Math.min(12, 8 + Math.floor(c.games / 3)),
+    supply: Math.min(1000000, Math.max(100000, Math.ceil(c.bank / 1000000) * 100000)),
+  });
   function careerSub() {
     const c = career(), el = $('#career-sub');
     if (el) el.textContent = c.games ? `Game ${c.games + 1} · start with ${rs(c.bank)} · total ${c.total >= 0 ? '+' : '−'}${rs(Math.abs(c.total))}` : 'Your money carries on, game after game';
@@ -491,10 +497,12 @@
     const avs = BR.AVATARS.filter((a) => a !== me.avatar).sort(() => Math.random() - 0.5);
     // rivals start richer as your bank grows, so a big bank is an edge, not a walkover
     const botCash = Math.max(R.startCash, Math.round(c.bank * 0.7 / 10000) * 10000);
-    for (let i = 0; i < 3; i++) roster.push({ id: 'bot' + i, name: names[i], bot: careerSkill(c), avatar: avs[i], color: BR.COLORS[(i + 1) % 6], cash: botCash });
-    const s = BR.createGame({ rounds: 8, turns: 3, companies: 8, career: { n: c.games + 1, start: c.bank } }, roster);
+    // the career grows: more rivals, more companies and more shares as you go
+    const lv = careerLevel(c);
+    for (let i = 0; i < lv.rivals; i++) roster.push({ id: 'bot' + i, name: names[i], bot: careerSkill(c), avatar: avs[i], color: BR.COLORS[(i + 1) % 6], cash: Math.round(botCash * (1 + i * 0.15) / 10000) * 10000 });
+    const s = BR.createGame({ rounds: lv.rounds, turns: 3, companies: lv.companies, supply: lv.supply, career: { n: c.games + 1, start: c.bank } }, roster);
     begin(LocalCtrl(s, 'me'));
-    later(() => banner(`💼 Career game ${c.games + 1}<small>You start with ${rs(c.bank)}</small>`, 'gold'), 2000);
+    later(() => banner(`💼 Career game ${c.games + 1}<small>${lv.rivals} rivals · ${lv.companies} companies · you start with ${rs(c.bank)}</small>`, 'gold'), 2000);
   }
   // saves the result once per career game (a reload on the results screen will not count it twice)
   function careerResult(v, mine, rank) {
@@ -682,7 +690,8 @@
       renderHand(v, me);
       activity(v, me);
       cashFx(me);
-      if (!UI.foundTold && U.canFound(v, me)) { UI.foundTold = true; later(() => { banner('🏢 ₹1 Cr club!<small>Tap "My company" on your turn to list it</small>', 'gold'); BR.sfx('bonus'); }, 1600); }
+      const nf = (me.founds || []).length;
+      if (UI.foundTold !== nf + 1 && U.canFound(v, me)) { UI.foundTold = nf + 1; later(() => { banner(`🏢 ${nf ? 'Empire time!' : '₹1 Cr club!'}<small>Tap "My company" on your turn to list ${nf ? `company #${nf + 1}` : 'it'}</small>`, 'gold'); BR.sfx('bonus'); }, 1600); }
       if (UI.modal === 'bank') bankModal(v, me, true);
       if (UI.modal === 'trade') tradeModal(v, me, UI.tradeTk, true);
       if (UI.modal === 'player') playerModal(v, me, UI.playerId, true);
@@ -867,14 +876,14 @@
         : la ? `<span class="la ${la.c}">${la.ic} ${esc(la.txt)}</span>` : `<span class="la flat">🃏${nCards} · ✨${nGold}</span>`;
       return `<div class="seat${turn ? ' turn' : ''}${p.id === me.id ? ' me' : ''}" data-seat="${esc(p.id)}">
         <div class="av" style="--pc:${p.color}">${esc(p.avatar || '🙂')}<i class="rk">${rank[p.id]}</i></div>
-        <div class="sn"><b>${esc(p.name)}${p.id === me.id ? ' (you)' : ''}${p.connected === false ? ' 📴' : ''}</b>${status}</div>
+        <div class="sn"><b>${p.tier ? R.tiers[p.tier - 1].icon + ' ' : ''}${esc(p.name)}${p.id === me.id ? ' (you)' : ''}${p.connected === false ? ' 📴' : ''}</b>${status}</div>
         <div class="w">${rs(U.netWorth(v, p))}${p.loan ? '<small>🏦 loan</small>' : ''}</div></div>`;
     }).join('');
     const box = $('#actbox');
     if (v.phase !== 'turns') { box.innerHTML = '<div class="act-tip">Round over. Check the reveal!</div>'; return; }
     const passLine = `Turn ${v.pass + 1} of ${v.settings.turns}`;
     const newsLine = v.news ? `<div class="news-line">📰 ${esc(v.news.text)}</div>` : '';
-    const spyBtn = (me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '') + (me.tip ? '<button class="btn small" data-act="tip">🕵️ Tip</button>' : '');
+    const spyBtn = (me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '') + (me.tip ? `<button class="btn small" data-act="tip">${me.tipKind === 'crystal' ? '🔮 Ball' : '🕵️ Tip'}</button>` : '');
     if (myTurn(v)) {
       box.innerHTML = `${newsLine}<div class="act-tip"><b>${passLine}</b> · tap a company to buy or sell, or play a ✨ card</div>
         <div class="act-btns">${spyBtn}${U.canFound(v, me) ? '<button class="btn gold" data-act="found">🏢 My company</button>' : ''}<button class="btn green" data-act="pass">✋ Pass</button></div>`;
@@ -1110,7 +1119,7 @@
       if (send({ type: 'special', card, tk: tk || undefined })) {
         BR.sfx('power'); closeModal(true);
         if (sp) banner(`${BR.SPECIALS[sp].icon} ${BR.SPECIALS[sp].name}${tk ? ' on ' + tk : ''}!`, 'gold');
-        if (UI.ctrl.local) { const nv = view(); const nm = meP(nv); if (sp === 'SPY' && nm.spy) spyModal(nv, nm); if (sp === 'TIP' && nm.tip) tipModal(nv, nm); } else if (sp === 'SPY') UI.wantSpy = true; else if (sp === 'TIP') UI.wantTip = true;
+        if (UI.ctrl.local) { const nv = view(); const nm = meP(nv); if (sp === 'SPY' && nm.spy) spyModal(nv, nm); if ((sp === 'TIP' || sp === 'CRYSTAL') && nm.tip) tipModal(nv, nm); } else if (sp === 'SPY') UI.wantSpy = true; else if (sp === 'TIP' || sp === 'CRYSTAL') UI.wantTip = true;
       }
     } else if (k.startsWith('amt:')) { UI.bankAmt = +k.slice(4); bankModal(v, me, true); }
     else if (k === 'loan' || k === 'repay' || k === 'fdIn' || k === 'fdOut') {
@@ -1193,16 +1202,18 @@
 
   function foundModal(v, me) {
     UI.foundIssue = UI.foundIssue || R.founderIssue[1];
-    const nm = UI.foundName || `${me.name.split(' ')[0]} Ventures`;
-    openModal('found', `<div class="gold-head"><div class="gold-ic">🏢</div><h2>Launch your own company</h2><button class="x" data-m="close">✕</button></div>
-      <p class="sp-desc">You're worth over ₹1 Cr! List your own company on the board.</p>
+    const e = U.nextEmpire(me) || R.empire[0];
+    const nth = (me.founds || []).length;
+    const nm = UI.foundName || `${me.name.split(' ')[0]} ${['Ventures', 'Industries', 'Global'][nth] || 'Group'}`;
+    openModal('found', `<div class="gold-head"><div class="gold-ic">🏢</div><h2>${nth ? `Launch company #${nth + 1}` : 'Launch your own company'}</h2><button class="x" data-m="close">✕</button></div>
+      <p class="sp-desc">You're worth over ${rs(e.at)}! List ${nth ? 'another' : 'your own'} company on the board.</p>
       <label>Company name<input id="found-name" maxlength="18" value="${esc(nm)}"></label>
       <div class="sec-h">IPO PRICE PER SHARE</div>
       <div class="chips">${R.founderIssue.map((x) => `<button class="chip${UI.foundIssue === x ? ' on' : ''}" data-m="fi:${x}">₹${x}</button>`).join('')}</div>
       <div class="m-box" style="margin-top:8px">
-        <div class="kv"><span>Listing fee (cash)</span><b>${rs(R.listingFee)}</b></div>
-        <div class="kv"><span>Founder shares you keep</span><b>${U.fmt(R.founderShares)}</b></div>
-        <div class="hint">Its IPO opens next round. Every share other players get in the IPO pays you the IPO price in cash. After that it trades like any other company, so price cards can push it up or crash it. You can found only one company per game. Uses your turn.</div>
+        <div class="kv"><span>Listing fee (cash)</span><b>${rs(e.fee)}</b></div>
+        <div class="kv"><span>Founder shares you keep</span><b>${U.fmt(e.shares)}</b></div>
+        <div class="hint">Its IPO opens next round. Every share other players get in the IPO pays you the IPO price in cash. After that it trades like any other company, so price cards can push it up or crash it. Build an empire of up to 3 companies: ${R.empire.map((x) => rs(x.at)).join(', ')} net worth. Uses your turn.</div>
       </div>
       <div class="m-foot"><button class="btn" data-m="close">Not now</button><button class="btn gold big" data-m="found">🚀 Found it</button></div>`, true);
   }
@@ -1279,8 +1290,8 @@
         <div><small>Loan</small><b class="${p.loan ? 'down' : ''}">${rs(p.loan)}</b></div><div><small>Cards</small><b>🃏${nCards} · ✨${nGold}</b></div>
       </div>
       ${curve ? `<div class="chart-box slim">${curve}</div>` : ''}
-      ${p.id === me.id && !p.founded ? `<div class="sec-h">🏢 OWN COMPANY AT ${rs(R.founderAt)} NET WORTH · ${Math.min(100, Math.floor(w / R.founderAt * 100))}%</div><div class="meter gold"><i style="width:${Math.min(100, w / R.founderAt * 100).toFixed(0)}%"></i></div>` : ''}
-      ${p.founded ? `<div class="hint">🏢 Founder of ${esc(p.founded)}</div>` : ''}
+      ${p.id === me.id && U.nextEmpire(p) ? (() => { const at = U.nextEmpire(p).at; return `<div class="sec-h">🏢 ${p.founded ? 'NEXT' : 'OWN'} COMPANY AT ${rs(at)} NET WORTH · ${Math.min(100, Math.floor(w / at * 100))}%</div><div class="meter gold"><i style="width:${Math.min(100, w / at * 100).toFixed(0)}%"></i></div>`; })() : ''}
+      ${p.founded ? `<div class="hint">🏢 Founder of ${esc((p.founds || [p.founded]).join(', '))}</div>` : ''}${p.tier ? `<div class="hint">${R.tiers[p.tier - 1].icon} ${R.tiers[p.tier - 1].name}</div>` : ''}
       <div class="p-cols"><div><div class="sec-h">HOLDINGS</div>${hrows}</div><div><div class="sec-h">LATEST MOVES</div>${acts}</div></div>`;
     if (refresh) $('#modal-card').innerHTML = html; else openModal('player', html, true);
   }
@@ -1313,6 +1324,14 @@
   function tipModal(v, me) {
     if (!me.tip) return;
     const by = {};
+    if (me.tipKind === 'crystal') {
+      const tk = me.tip[0] && me.tip[0].tk, c = tk && U.company(v, tk), n = me.tip.reduce((a, k) => a + k.v, 0);
+      const rows = me.tip.map((k) => `<div class="prow"><span><b>${esc(k.who)}</b></span><b class="${cls(k.v)}">${sgn(k.v)}</b></div>`).join('') || '<div class="hint">No cards for this company this round.</div>';
+      openModal('tip', `<h2>🔮 Crystal Ball<small>${c ? c.name : ''}</small><button class="x" data-m="close">✕</button></h2>${rows}
+        <div class="prow">${c ? logo(c, 24) : ''}<span><b>Cards total</b><small>before owners, news and gold cards</small></span><b class="${cls(n)}">${sgn(n)}</b></div>
+        <p class="hint">Only you can see this. Open it again this round from the 🔮 button.</p><div class="m-foot"><button class="btn gold" data-m="close">Got it</button></div>`, true);
+      return;
+    }
     for (const k of me.tip) (by[k.tk] = by[k.tk] || []).push(k.v);
     const rows = Object.keys(by).map((tk) => { const c = U.company(v, tk); const n = by[tk].reduce((a, x) => a + x, 0);
       return `<div class="prow">${c ? logo(c, 24) : ''}<span><b>${tk}</b><small>${by[tk].map((x) => `<b class="${cls(x)}">${sgn(x)}</b>`).join(' ')}</small></span><b class="${cls(n)}">${sgn(n)}</b></div>`; }).join('') || '<div class="hint">No hidden cards this round.</div>';
@@ -1420,6 +1439,8 @@
     const myPl = v.reveal.pl[me.id] || 0;
     sum.innerHTML = `Your round: <b class="${cls(myPl)}">${myPl >= 0 ? '+' : ''}${rs(myPl)}</b>`;
     if (myPl > 0) { BR.sfx('win'); const h = $('#modal-card h2').getBoundingClientRect(); moneyFly(h, '#tb-worth', myPl); }
+    const t = (v.reveal.titles || []).find((x) => x.pid === me.id);
+    if (t) later(() => { banner(`${t.icon} You're a ${t.name}!<small>Bonus gold card</small>`, 'gold'); BR.sfx('bonus'); confetti(); }, 900);
     else if (myPl < 0) BR.sfx('lose');
   }
 
@@ -1543,26 +1564,23 @@
     <h4>🎯 Goal</h4><p>Everyone starts with ₹5 lakh. After the last round, the richest player wins (cash + shares + deposit − loan).</p>
     <h4>🃏 Each round</h4><ul><li>Everyone gets <b>7 secret price cards</b>. A card like <b>KAIR +15</b> means that company will rise ₹15 at the reveal; <b>ORBT −10</b> means it will fall.</li>
     <li>Players take turns around the table. On your turn do <b>one</b> thing: buy, sell, apply for an IPO, play a gold card, or pass.</li>
-    <li>Shares come in blocks of 1,000. Each company has only 1,00,000 shares.</li></ul>
+    <li>Shares come in blocks of 1,000. Each company starts with 1,00,000 shares (the host can pick up to 5 lakh). When fewer than 20% are left, the company issues more, up to 20 lakh.</li></ul>
     <h4>🎉 The big reveal</h4><p>When the round ends, <b>every</b> card is flipped, including a few hidden market cards. Each company moves by the total. Watch what rivals buy and sell: tap a player to see their holdings, or open 📜 Trades.</p>
     <h4>👑 Owners</h4><ul><li>🎩 <b>Co-owner</b>: hold the most shares of a company, at least 20,000. Its worst minus card is cancelled at the reveal.</li>
     <li>👑 <b>Owner</b>: at least 50,000 shares. The two worst minus cards are cancelled.</li></ul>
     <h4>💥 Bankrupt and 🎉 bonus</h4><ul><li>A company that falls to ₹0 goes bankrupt and its shares are wiped out. It comes back next round at its starting price.</li>
     <li>At ₹250 a company gives a 1:1 bonus: shares double, price halves.</li></ul>
     <h4>✨ Gold cards</h4><p>Gold cards are secret: rivals only see that you played one, and find out which at the reveal. Everyone starts with 3 and keeps them until played. Players in the bottom half get a new one after each reveal, so nobody runs away with the game.</p>
-    <ul><li>🎟 Rights Offer: extra shares at half price · 🚨 Scam Exposed: −₹40 · 🔒 Trading Freeze: no move</li>
-    <li>🚀 Rupee Rocket: all +10% · 📉 Rupee Slide: all −10% · 🚧 Upper Limit: max +₹15 · 🪂 Lower Limit: max −₹15</li>
-    <li>💰 Dividend Day: ₹5 per share · 🔍 Spy Glass: see a rival's hand</li>
-    <li>🐂 Bull Charge: +₹25 · 🎲 Double Trouble: moves ×2 · 🛟 Safety Net: the bank covers your loss on one company</li>
-    <li>🕵️ Insider Tip: see the hidden market cards · 🧾 Tax Raid: the richest rival pays 5% · 🎁 Lucky Bonus: ₹1 lakh now</li></ul>
+    <ul class="gold-list">${Object.values(BR.SPECIALS).map((d) => `<li>${d.icon} <b>${d.name}</b>: ${d.desc}</li>`).join('')}</ul>
     <h4>📰 Market news</h4><p>Most rounds open with a headline. Good news lifts every company in that sector at the reveal, bad news drags them down. "Dividend season" pays every shareholder ₹2 per share.</p>
     <h4>🐻 Short Sell</h4><p>A gold card that bets on a fall: you earn ₹10,000 for every ₹1 the company drops. If it rises you pay the same, at most ₹2 lakh.</p>
     <h4>👥 Play with friends</h4><p><b>📱 Pass &amp; Play:</b> no internet needed, everyone shares one phone and passes it on. <b>📶 Same Wi-Fi:</b> friends nearby connect directly. <b>🌍 Anywhere:</b> friends in other places join the room code with their own internet or mobile data.</p>
-    <h4>💼 Career</h4><p>A long run against bots. Each game starts with the money you finished the last one with, and every game's profit adds to your career total. Win more and the bots get tougher. Drop below the starting cash and you get a fresh start.</p>
+    <h4>💼 Career</h4><p>A long run against bots. Each game starts with the money you finished the last one with, and every game's profit adds to your career total. Every game adds rivals and companies, and the bots get richer and tougher. Drop below the starting cash and you get a fresh start.</p>
     <h4>📅 Daily challenge and 🏅 achievements</h4><p>Open 🏆 Stats on the home screen. The daily challenge is the same game for everyone each day: hit the target to beat it. Achievements unlock as you play.</p>
     <h4>😀 Reactions</h4><p>Tap 😀 at the top during a game to send an emoji or a quick message to the table.</p>
-    <h4>🚀 IPOs</h4><p>A few times per game a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
-    <h4>🏢 Your own company</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company.</p>
+    <h4>🚀 IPOs</h4><p>Every couple of rounds a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
+    <h4>🏢 Build an empire</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company. Grow to ₹5 Cr for a second company (₹25 lakh fee, 50,000 shares) and ₹25 Cr for a third (₹1 Cr fee, 1 lakh shares).</p>
+    <h4>💎 Rich titles</h4><p>Cross ${R.tiers.map((x) => `${x.icon} ${x.name} (${rs(x.at)})`).join(', ')} and the whole table hears about it. Each new title earns a bonus gold card.</p>
     <h4>⏱ Game length</h4><p>Pick 6 to 20 rounds or ∞ (no limit). The host can add rounds or call the last round from the ☰ menu, and can keep playing after the final results.</p>
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>
     <h4>🌐 Online</h4><p>One player hosts a room and shares the 5-letter code. Up to 6 players; bots can fill empty seats.</p>`;
