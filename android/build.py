@@ -13,6 +13,7 @@ SDK = os.environ.get("BR_SDK", "/tmp/claude-0/sdk")
 ANDROID_JAR = os.path.join(SDK, "android-34.jar")
 DX_JAR = os.path.join(SDK, "dx.jar")
 APKSIG_JAR = os.path.join(SDK, "apksig.jar")
+BUNDLETOOL_JAR = os.path.join(SDK, "bundletool.jar")  # github.com/google/bundletool releases, 1.17.2
 OUT = os.path.join(HERE, "out")
 
 PACKAGE = "com.bullrush.game"
@@ -127,7 +128,7 @@ def manifest():
     config_changes = 0x10 | 0x20 | 0x80 | 0x100 | 0x200 | 0x400 | 0x800  # keyboard..smallestScreenSize
     x.el("manifest", [(False, "package", T_STRING, PACKAGE),
                       A("versionCode", T_DEC, VERSION_CODE), A("versionName", T_STRING, VERSION_NAME)], [
-        ("uses-sdk", [A("minSdkVersion", T_DEC, 24), A("targetSdkVersion", T_DEC, 34)]),
+        ("uses-sdk", [A("minSdkVersion", T_DEC, 24), A("targetSdkVersion", T_DEC, 35)]),
         ("uses-permission", [A("name", T_STRING, "android.permission.INTERNET")]),
         ("uses-permission", [A("name", T_STRING, "android.permission.ACCESS_NETWORK_STATE")]),
         ("queries", [], [  # Android 11+ hides the text-to-speech engine without this
@@ -224,6 +225,34 @@ def main():
     apk = os.path.join(OUT, "BullRush.apk")
     run(["java", "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED", "--add-exports", "java.base/sun.security.pkcs=ALL-UNNAMED", "--add-exports", "java.base/sun.security.util=ALL-UNNAMED", "-cp", APKSIG_JAR + os.pathsep + signer, "com.bullrush.game.Sign", keystore, "bullrush", unsigned, apk])
     print("APK:", apk, os.path.getsize(apk), "bytes")
+    if os.path.exists(BUNDLETOOL_JAR):
+        bundle(dex, keystore)
+
+
+def bundle(dex, keystore):
+    """Google Play wants an Android App Bundle: a base module with a proto-format manifest and resource table."""
+    mod = os.path.join(OUT, "module")
+    os.makedirs(mod)
+    proto = os.path.join(OUT, "proto")
+    os.makedirs(proto)
+    run(["javac", "-nowarn", "-cp", BUNDLETOOL_JAR, "-d", proto, os.path.join(HERE, "bundle/ProtoRes.java")])
+    run(["java", "-cp", BUNDLETOOL_JAR + os.pathsep + proto, "com.bullrush.game.ProtoRes", PACKAGE, LABEL, str(VERSION_CODE), VERSION_NAME, mod])
+    base = os.path.join(OUT, "base.zip")
+    with zipfile.ZipFile(base, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(os.path.join(mod, "AndroidManifest.xml"), "manifest/AndroidManifest.xml")
+        z.write(os.path.join(mod, "resources.pb"), "resources.pb")
+        z.write(dex, "dex/classes.dex")
+        z.write(os.path.join(HERE, "icon.png"), ICON_PATH)
+        www = os.path.join(ROOT, "www")
+        for b, _dirs, files in os.walk(www):
+            for f in sorted(files):
+                p = os.path.join(b, f)
+                z.write(p, "assets/www/" + os.path.relpath(p, www).replace(os.sep, "/"))
+    aab = os.path.join(OUT, "BullRush.aab")
+    run(["java", "-jar", BUNDLETOOL_JAR, "build-bundle", "--modules=" + base, "--output=" + aab])
+    run(["jarsigner", "-keystore", keystore, "-storetype", "PKCS12", "-storepass", "bullrush", "-sigalg", "SHA256withRSA", "-digestalg", "SHA-256", aab, "bullrush"])
+    run(["java", "-jar", BUNDLETOOL_JAR, "validate", "--bundle=" + aab])
+    print("AAB:", aab, os.path.getsize(aab), "bytes")
 
 
 if __name__ == "__main__":
