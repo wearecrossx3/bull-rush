@@ -829,7 +829,7 @@
       const left = c.status === 'active' ? U.available(v, c) : 0;
       return `<div class="deed${c.status === 'bankrupt' ? ' dead' : ''}${c.status === 'ipo' ? ' ipo' : ''}${me.hold[c.tk] ? ' mine' : ''}${ping}" style="--c:${c.color}" data-tile="${c.tk}">
         <div class="d-band">${logo(c, 26)}<div class="d-id"><b>${c.founder ? '🏢' : ''}${c.tk}</b><small>${esc(c.name)}</small></div>
-          ${own ? `<span class="d-own" title="${own.rank === 'owner' ? 'Owner' : 'Co-owner'}">${own.rank === 'owner' ? '👑' : '🎩'}${esc(own.p.avatar)}</span>` : ''}</div>
+          ${c.boss && U.player(v, c.boss) ? `<span class="d-own" title="Boss">🦈${esc(U.player(v, c.boss).avatar)}</span>` : own ? `<span class="d-own" title="${own.rank === 'owner' ? 'Owner' : 'Co-owner'}">${own.rank === 'owner' ? '👑' : '🎩'}${esc(own.p.avatar)}</span>` : ''}</div>
         <div class="d-body">
           <div class="d-row"><span class="d-px">₹${price}</span>${c.status === 'ipo' ? '<span class="d-chg ipo">🚀 IPO</span>' : c.last ? `<span class="d-chg ${cls(c.last)}">${c.last > 0 ? '▲' : '▼'}${Math.abs(c.last)}</span>` : ''}</div>
           ${c.status === 'ipo' ? `<div class="d-ipo">Apply now · ${v.ipo ? v.ipo.blocks : ''} blocks</div>` : spark(c.history, 100, 22)}
@@ -848,7 +848,9 @@
     ipo: (t) => ({ ic: '🚀', txt: `Got ${kq(t.qty)} ${t.tk} (${t.note})`, c: 'ipo' }),
     rights: (t) => ({ ic: '🎟', txt: `Rights +${kq(t.qty)} ${t.tk}`, c: 'up' }),
     gold: (t) => ({ ic: '✨', txt: `${t.note}${t.tk ? ' on ' + t.tk : ''}`, c: 'gold' }),
-    div: (t) => ({ ic: '💰', txt: `Dividend from ${t.tk}`, c: 'up' }),
+    div: (t) => (t.note === 'boss profit' ? { ic: '🦈', txt: `Boss profit ${rs(t.px)} from ${t.tk}`, c: 'up' }
+      : t.note === 'mission bonus' ? { ic: '🎯', txt: `Mission bonus ${rs(t.px)}`, c: 'up' } : { ic: '💰', txt: `Dividend from ${t.tk}`, c: 'up' }),
+    takeover: (t) => ({ ic: '🦈', txt: t.qty ? `Hostile takeover of ${t.tk}` : `Took over ${t.tk}`, c: 'gold' }),
     loan: (t) => ({ ic: '🏦', txt: `Borrowed ${rs(t.px)}`, c: 'flat' }),
     repay: (t) => ({ ic: '🏦', txt: `Repaid ${rs(t.px)}`, c: 'flat' }),
     fd: (t) => ({ ic: '🔐', txt: `${t.note === 'deposit' ? 'Deposited' : 'Withdrew'} ${rs(t.px)}`, c: 'flat' }),
@@ -873,7 +875,7 @@
       const nGold = p.id === me.id ? p.gold.length : (p.goldCount !== undefined ? p.goldCount : p.gold.length);
       const la = p.lastAct && p.lastAct.r === v.round ? verb(p.lastAct) : null;
       const status = turn && p.id !== me.id ? '<span class="la think">thinking<span class="dots"></span></span>'
-        : la ? `<span class="la ${la.c}">${la.ic} ${esc(la.txt)}</span>` : `<span class="la flat">🃏${nCards} · ✨${nGold}</span>`;
+        : la ? `<span class="la ${la.c}">${la.ic} ${esc(la.txt)}</span>` : `<span class="la flat">🃏${nCards} · ✨${nGold}${p.id === me.id && p.missions ? ` · 🎯${p.missions.filter((m) => m.done).length}/${p.missions.length}` : ''}</span>`;
       return `<div class="seat${turn ? ' turn' : ''}${p.id === me.id ? ' me' : ''}" data-seat="${esc(p.id)}">
         <div class="av" style="--pc:${p.color}">${esc(p.avatar || '🙂')}<i class="rk">${rank[p.id]}</i></div>
         <div class="sn"><b>${p.tier ? R.tiers[p.tier - 1].icon + ' ' : ''}${esc(p.name)}${p.id === me.id ? ' (you)' : ''}${p.connected === false ? ' 📴' : ''}</b>${status}</div>
@@ -882,7 +884,7 @@
     const box = $('#actbox');
     if (v.phase !== 'turns') { box.innerHTML = '<div class="act-tip">Round over. Check the reveal!</div>'; return; }
     const passLine = `Turn ${v.pass + 1} of ${v.settings.turns}`;
-    const newsLine = v.news ? `<div class="news-line">📰 ${esc(v.news.text)}</div>` : '';
+    const newsLine = (v.event ? `<div class="news-line ev">${v.event.icon} <b>${esc(v.event.name)}</b>: ${esc(v.event.desc)}</div>` : '') + (v.news ? `<div class="news-line">📰 ${esc(v.news.text)}</div>` : '');
     const spyBtn = (me.spy ? `<button class="btn small" data-act="spy">🔍 ${esc(me.spy.who)}</button>` : '') + (me.tip ? `<button class="btn small" data-act="tip">${me.tipKind === 'crystal' ? '🔮 Ball' : '🕵️ Tip'}</button>` : '');
     if (myTurn(v)) {
       box.innerHTML = `${newsLine}<div class="act-tip"><b>${passLine}</b> · tap a company to buy or sell, or play a ✨ card</div>
@@ -1108,6 +1110,8 @@
       if (send({ type: k, tk: UI.tradeTk, blocks: k === 'sell' && b.dataset.all ? (me.hold[UI.tradeTk] || 0) / R.block : UI.blocks })) {
         BR.sfx(k); closeModal(true);
       }
+    } else if (k === 'takeover' || k === 'hostile') {
+      if (send({ type: k, tk: UI.tradeTk })) { closeModal(true); BR.sfx('fanfare'); confetti(); banner(`🦈 ${k === 'hostile' ? 'Hostile takeover!' : 'Takeover!'}<small>You now run ${esc(UI.tradeTk)}</small>`, 'gold'); }
     } else if (k === 'i+' || k === 'i-') {
       UI.ipoBlocks = Math.max(1, Math.min(R.ipoMaxBlocks, UI.ipoBlocks + (k === 'i+' ? 1 : -1)));
       ipoModal(v, me);
@@ -1180,7 +1184,8 @@
           ${need && c.status === 'active' ? `<div class="hint">🎯 ${need}</div>` : ''}
         </div>
         <div class="tg-right"><div class="sec-h">WHO OWNS IT · ${kq(U.available(v, c))} LEFT</div>${holders}
-          ${ownr ? `<div class="hint">${ownr.rank === 'owner' ? '👑' : '🎩'} ${esc(ownr.p.name)} cancels the ${ownr.blocks === 2 ? 'two worst' : 'worst'} minus card${ownr.blocks === 2 ? 's' : ''} here at the reveal.</div>` : ''}</div>
+          ${ownr ? `<div class="hint">${ownr.rank === 'owner' ? '👑' : '🎩'} ${esc(ownr.p.name)} cancels the ${ownr.blocks === 2 ? 'two worst' : 'worst'} minus card${ownr.blocks === 2 ? 's' : ''} here at the reveal.</div>` : ''}
+          ${takeoverLine(v, me, c)}</div>
       </div>
       <div class="stepper"><button data-m="b-">−</button><b>${UI.blocks} block${UI.blocks > 1 ? 's' : ''}<small>${(UI.blocks * R.block).toLocaleString('en-IN')} shares · ${rs(cost)}</small></b><button data-m="b+">+</button><button class="btn small" data-m="bmax">MAX</button></div>
       ${can ? '' : `<div class="hint center">${c.status !== 'active' ? 'Not trading right now.' : 'Wait for your turn to trade.'}</div>`}
@@ -1189,6 +1194,22 @@
         <button class="btn red ghosty" data-m="sell" data-all="1" ${can && own ? '' : 'disabled'}>Sell all</button>
         <button class="btn green big" data-m="buy" ${can && cost <= me.cash ? '' : 'disabled'}>Buy ${rs(cost)}</button></div>`;
     if (refresh) $('#modal-card').innerHTML = html; else openModal('trade', html, true);
+  }
+
+  // who controls a company, and what it takes to take it over or raid the boss
+  function takeoverLine(v, me, c) {
+    if (c.status !== 'active') return '';
+    const sup = c.supply || R.supply, boss = c.boss && U.player(v, c.boss);
+    const profit = Math.round(c.price * sup * R.bossProfit / 1000) * 1000;
+    const mv = myTurn(v) && U.takeoverMove(v, me, c);
+    let h = boss ? `<div class="hint">🦈 <b>${esc(boss.name)}</b> controls ${c.tk} and earns ${rs(profit)} every round.</div>`
+      : `<div class="hint">🦈 Own ${kq(Math.ceil(sup * R.takeoverAt))} shares (half) to take it over and earn ${rs(profit)} every round.</div>`;
+    if (mv === 'takeover') h += `<button class="btn gold" data-m="takeover">🦈 Take over ${c.tk}</button>`;
+    if (mv === 'hostile') {
+      const q = boss.hold[c.tk] || 0, px = Math.ceil(c.price * R.hostilePremium);
+      h += `<button class="btn gold" data-m="hostile" ${q * px <= me.cash ? '' : 'disabled'}>🦈 Hostile bid · ${rs(q * px)}</button><div class="hint">Buys out ${esc(boss.name)}'s ${kq(q)} shares at ₹${px} (30% above the price).</div>`;
+    } else if (boss && boss.id !== me.id) h += `<div class="hint">With ${kq(Math.ceil(sup * R.hostileAt))} shares you can make a hostile bid to buy out the boss at 30% above the price.</div>`;
+    return h;
   }
 
   const px1 = (x) => (Math.abs(x - Math.round(x)) < 0.05 ? Math.round(x) : x.toFixed(1));
@@ -1292,6 +1313,9 @@
       ${curve ? `<div class="chart-box slim">${curve}</div>` : ''}
       ${p.id === me.id && U.nextEmpire(p) ? (() => { const at = U.nextEmpire(p).at; return `<div class="sec-h">🏢 ${p.founded ? 'NEXT' : 'OWN'} COMPANY AT ${rs(at)} NET WORTH · ${Math.min(100, Math.floor(w / at * 100))}%</div><div class="meter gold"><i style="width:${Math.min(100, w / at * 100).toFixed(0)}%"></i></div>`; })() : ''}
       ${p.founded ? `<div class="hint">🏢 Founder of ${esc((p.founds || [p.founded]).join(', '))}</div>` : ''}${p.tier ? `<div class="hint">${R.tiers[p.tier - 1].icon} ${R.tiers[p.tier - 1].name}</div>` : ''}
+      ${(p.missions || []).length ? `<div class="sec-h">🎯 SECRET MISSIONS${p.id === me.id ? '' : ' · hidden until done'}</div>${p.missions.map((m) => { const d = m.id && BR.MISSIONS[m.id];
+        return d ? `<div class="prow mis${m.done ? ' done' : ''}"><span><b>${d.icon} ${esc(d.name)}${m.done ? ' ✅' : ''}</b><small>${esc(d.desc)}</small></span><b class="up">+${rs(m.paid || Math.round(Math.max(v.settings.startCash, p.worth[0]) * d.x / 1000) * 1000)}</b></div>`
+          : '<div class="prow mis"><span><b>❓ Secret</b><small>Revealed when completed</small></span></div>'; }).join('')}` : ''}
       <div class="p-cols"><div><div class="sec-h">HOLDINGS</div>${hrows}</div><div><div class="sec-h">LATEST MOVES</div>${acts}</div></div>`;
     if (refresh) $('#modal-card').innerHTML = html; else openModal('player', html, true);
   }
@@ -1373,7 +1397,7 @@
     if (v.phase === 'turns') {
       if (UI.modal === 'reveal') closeModal(true);
       if (UI.ctrl.local && !UI.ctrl.online && !UI.ctrl.tut) store.set(SAVE, v);
-      later(() => banner(`<small>ROUND</small>${v.round}<small>${v.ipo ? '🚀 IPO: ' + esc(v.ipo.name) : v.news ? '📰 ' + esc(v.news.text) : 'Cards dealt'}</small>`, 'round'), first ? 300 : 50);
+      later(() => banner(`<small>ROUND</small>${v.round}<small>${v.event ? v.event.icon + ' ' + esc(v.event.name) : v.ipo ? '🚀 IPO: ' + esc(v.ipo.name) : v.news ? '📰 ' + esc(v.news.text) : 'Cards dealt'}</small>`, 'round'), first ? 300 : 50);
       BR.sfx('deal');
       const h = $('#hand'); h.classList.add('dealt'); setTimeout(() => h.classList.remove('dealt'), 1000);
     } else if (v.phase === 'reveal') { BR.sfx('bell'); revealModal(v, me, false); }
@@ -1439,6 +1463,8 @@
     const myPl = v.reveal.pl[me.id] || 0;
     sum.innerHTML = `Your round: <b class="${cls(myPl)}">${myPl >= 0 ? '+' : ''}${rs(myPl)}</b>`;
     if (myPl > 0) { BR.sfx('win'); const h = $('#modal-card h2').getBoundingClientRect(); moneyFly(h, '#tb-worth', myPl); }
+    const ms = (v.reveal.missions || []).filter((x) => x.pid === me.id);
+    ms.forEach((m, i) => later(() => { const d = BR.MISSIONS[m.id]; banner(`🎯 Mission complete!<small>${d.icon} ${esc(d.name)} · +${rs(m.amt)}</small>`, 'gold'); BR.sfx('bonus'); }, 600 + i * 1600));
     const t = (v.reveal.titles || []).find((x) => x.pid === me.id);
     if (t) later(() => { banner(`${t.icon} You're a ${t.name}!<small>Bonus gold card</small>`, 'gold'); BR.sfx('bonus'); confetti(); }, 900);
     else if (myPl < 0) BR.sfx('lose');
@@ -1580,6 +1606,9 @@
     <h4>😀 Reactions</h4><p>Tap 😀 at the top during a game to send an emoji or a quick message to the table.</p>
     <h4>🚀 IPOs</h4><p>Every couple of rounds a new company goes public. Apply on your turn. If too many blocks are asked for, everyone gets a fair share and the rest is refunded.</p>
     <h4>🏢 Build an empire</h4><p>Reach ₹1 Cr net worth and you can list your own company (₹10 lakh listing fee, uses your turn). You keep 30,000 founder shares, and every share rivals get in its IPO pays you cash. Then it trades like any other company. Grow to ₹5 Cr for a second company (₹25 lakh fee, 50,000 shares) and ₹25 Cr for a third (₹1 Cr fee, 1 lakh shares).</p>
+    <h4>⚡ Event rounds</h4><p>Every third round has a twist, and the last round is always a frenzy:</p><ul>${Object.values(BR.EVENTS).map((e) => `<li>${e.icon} <b>${e.name}</b>: ${e.desc}</li>`).join('')}</ul>
+    <h4>🎯 Secret missions</h4><p>Everyone gets 2 secret missions each game. Finish one at a reveal and you win a cash bonus, and the table finds out which mission it was. Tap yourself to see yours.</p><ul>${Object.values(BR.MISSIONS).map((m) => `<li>${m.icon} <b>${m.name}</b>: ${m.desc}</li>`).join('')}</ul>
+    <h4>🦈 Takeovers</h4><p>Own half of a company's shares and you can take it over (uses your turn). The boss earns 1% of the company's value every round. Keep at least a quarter of the shares or you lose control. A rival with 20% can make a hostile bid: they buy out the boss's whole stake at 30% above the price and take control.</p>
     <h4>💎 Rich titles</h4><p>Cross ${R.tiers.map((x) => `${x.icon} ${x.name} (${rs(x.at)})`).join(', ')} and the whole table hears about it. Each new title earns a bonus gold card.</p>
     <h4>⏱ Game length</h4><p>Pick 6 to 20 rounds or ∞ (no limit). The host can add rounds or call the last round from the ☰ menu, and can keep playing after the final results.</p>
     <h4>🏦 Bank</h4><p>Borrow ₹2 lakh on trust plus half the value of your shares, at 5% per round. Park spare cash in a fixed deposit for 2% per round. If your shares crash and the loan passes ₹2 lakh + 70% of everything you own, the bank sells your shares (margin call). The bank never uses your turn.</p>

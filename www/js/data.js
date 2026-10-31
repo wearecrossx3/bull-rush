@@ -102,6 +102,33 @@
     CRYSTAL: { name: 'Crystal Ball', icon: '🔮', target: true, desc: 'See every price card for this company this round, in every hand and the market.' },
   };
 
+  // Event rounds: every third round (and always the last one) has its own twist.
+  BR.EVENTS = {
+    BULLRUN: { name: 'Bull Run', icon: '🐂', desc: 'Every plus card counts double this round.' },
+    CRASH: { name: 'Market Crash', icon: '🐻', desc: 'Every minus card counts double this round.' },
+    BUDGET: { name: 'Budget Day', icon: '🏛', desc: 'The budget moves every sector up or down by ₹10 at the reveal.' },
+    DIVFEST: { name: 'Dividend Festival', icon: '🪔', desc: 'Every company pays ₹5 per share at the reveal.' },
+    GOLDRAIN: { name: 'Gold Rain', icon: '🌟', desc: 'Everyone gets a free gold card.' },
+    BANKHOL: { name: 'Bank Holiday', icon: '🏖', desc: 'No loan interest this round, and deposits earn 10%.' },
+    FRENZY: { name: 'Closing Bell Frenzy', icon: '🔔', desc: 'Final round: every price move counts double!' },
+  };
+
+  // Secret missions: two hidden goals per player, paid as a cash bonus (x times the starting money).
+  BR.MISSIONS = {
+    OWNER: { name: 'Big Boss', icon: '👑', desc: 'Be the 👑 Owner of any company at a reveal.', x: 0.5 },
+    DIVERSE: { name: 'Spread Out', icon: '🧺', desc: 'Hold shares in 5 different companies at once.', x: 0.4 },
+    DOUBLE: { name: 'Double Up', icon: '✖️', desc: 'Double your starting net worth.', x: 0.6 },
+    BIGROUND: { name: 'Hot Streak', icon: '🔥', desc: 'Grow your net worth by 25% in a single round.', x: 0.5 },
+    CASH: { name: 'Cash King', icon: '💵', desc: 'Have 1.5 times your starting money as cash at a reveal.', x: 0.4 },
+    FD: { name: 'Safe Saver', icon: '🏦', desc: 'Keep half your starting money in a fixed deposit at a reveal.', x: 0.3 },
+    GOLD3: { name: 'Card Shark', icon: '🃏', desc: 'Play 3 gold cards in one game.', x: 0.3 },
+    IPO: { name: 'First in Line', icon: '🚀', desc: 'Get shares in an IPO.', x: 0.3 },
+    FOUND: { name: 'Founder', icon: '🏢', desc: 'Found your own company.', x: 0.8 },
+    BOSS: { name: 'Raider', icon: '🦈', desc: 'Take over a company.', x: 0.8 },
+    LOAN: { name: 'Debt Free', icon: '🕊', desc: 'Take a bank loan and pay it all back.', x: 0.3 },
+    BAGGER: { name: 'Multibagger', icon: '📈', desc: 'Own a stock at double your average buy price.', x: 0.6 },
+  };
+
   // Emoji and quick-chat reactions anyone can send at any time.
   BR.REACTS = ['😂', '😎', '😱', '😡', '🔥', '👏', '🤑', '😭', 'Good move!', 'Oh no!', 'Hurry up!', 'Well played', 'Watch this', 'Sorry!'];
 
@@ -167,6 +194,11 @@
     // empire: each extra company of your own needs more net worth and a bigger listing fee
     empire: [{ at: 10000000, fee: 1000000, shares: 30000 }, { at: 50000000, fee: 2500000, shares: 50000 }, { at: 250000000, fee: 10000000, shares: 100000 }],
     maxCompanies: 16,
+    takeoverAt: 0.5,      // own half a company's shares to take control of it
+    keepControl: 0.25,    // drop below a quarter and you lose control
+    hostileAt: 0.2,       // a rival with 20% can make a hostile bid...
+    hostilePremium: 1.3,  // ...buying the boss out at 30% above the price
+    bossProfit: 0.01,     // the boss earns 1% of the company's value every round
     issueAt: 0.2,         // when less than 20% of a company's shares are left, it issues more
     issueMax: 2000000,    // ...up to 20 lakh shares in total
     // net worth titles; reaching one is celebrated and earns a gold card

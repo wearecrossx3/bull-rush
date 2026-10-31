@@ -120,6 +120,12 @@
       ready: false, connected: true, worth: [r.cash || s.settings.startCash], seat: i, lastAct: null, spy: null,
       tier: R.tiers.filter((x) => (r.cash || s.settings.startCash) >= x.at).length,
     }));
+    const mPool = Object.keys(BR.MISSIONS);
+    for (const p of s.players) {
+      const ids = shuffle(s, mPool.slice()).slice(0, 2);
+      p.missions = ids.map((id) => ({ id, done: false }));
+      p.goldPlayed = 0; p.ipoWins = 0; p.everLoan = false;
+    }
     const nGold = s.settings.gold != null ? s.settings.gold : R.startGold;
     for (const p of s.players) for (let i = 0; i < nGold; i++) p.gold.push(goldCard(s, p));
     s.dealer = Math.floor(rnd(s) * s.players.length);
@@ -218,6 +224,7 @@
     }
 
     pickNews(s);
+    pickEvent(s);
 
     const cos = s.companies.filter((c) => c.status === 'active' || c.status === 'ipo');
     const n = s.players.length;
@@ -238,6 +245,24 @@
     s.botWait = R.botThink[0] + 1;
     log(s, `Round ${s.round}: cards dealt. ${current(s).name} starts.`, 'sys');
     s.v++;
+  }
+
+  // every third round has a twist, and the last round is always a frenzy
+  function pickEvent(s) {
+    s.event = null;
+    if (s.settings.events === false) return;
+    let id = null;
+    if (lastRound(s) && s.round > 2) id = 'FRENZY';
+    else if (s.round >= 3 && s.round % 3 === 0) id = pick(s, Object.keys(BR.EVENTS).filter((k) => k !== 'FRENZY'));
+    if (!id) return;
+    const e = Object.assign({ id }, BR.EVENTS[id]);
+    if (id === 'BUDGET') {
+      e.budget = {};
+      for (const c of s.companies) if (e.budget[c.sector] === undefined) e.budget[c.sector] = rnd(s) < 0.5 ? 10 : -10;
+    }
+    if (id === 'GOLDRAIN' && s.settings.gold !== 0) for (const p of s.players) if (p.gold.length <= R.maxGold) p.gold.push(goldCard(s, p));
+    s.event = e;
+    log(s, `${e.icon} ${e.name}! ${e.desc}`, 'ipo');
   }
 
   // most rounds open with a headline; it only uses sectors that are on the board
@@ -283,7 +308,7 @@
         const shares = got * R.block;
         p.cash += p.ipoBlocked - shares * c.issue;
         p.ipoBlocked = 0;
-        if (shares) { p.hold[c.tk] = (p.hold[c.tk] || 0) + shares; addCost(p, c.tk, shares * c.issue); }
+        if (shares) { p.hold[c.tk] = (p.hold[c.tk] || 0) + shares; addCost(p, c.tk, shares * c.issue); p.ipoWins = (p.ipoWins || 0) + 1; }
         events.push(`${p.avatar} ${p.name} got ${got} of ${p.ipoBlocks} IPO blocks in ${c.tk}.`);
         trade(s, p, 'ipo', c.tk, shares, c.issue, `allotted ${got}/${p.ipoBlocks}`);
       }
@@ -316,7 +341,11 @@
         worst.forEach((k) => (k.blocked = true));
         if (worst.length) mods.push(`${own.rank === 'owner' ? '👑 Owner' : '🎩 Co-owner'} ${own.p.name} removed ${worst.map((k) => k.v).join(', ')}`);
       }
-      let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v), 0);
+      const ev = s.event && s.event.id;
+      const mult = (x) => (ev === 'BULLRUN' && x > 0) || (ev === 'CRASH' && x < 0) ? 2 : 1;
+      let total = cards.reduce((a, k) => a + (k.blocked ? 0 : k.v * mult(k.v)), 0);
+      if (ev === 'BULLRUN' || ev === 'CRASH') mods.push(`${s.event.icon} ${ev === 'BULLRUN' ? 'plus' : 'minus'} ×2`);
+      if (ev === 'BUDGET') { const b = s.event.budget[c.sector] || 0; if (b) { total += b; mods.push(`🏛 ${b > 0 ? '+' : ''}${b}`); } }
       const on = (sp) => s.plays.some((x) => x.sp === sp && x.tk === c.tk);
       if (on('DOUBLE') && total) { total *= 2; mods.push('🎲 ×2'); }
       if (on('SCAM')) { total -= 40; mods.push('🚨 −40'); }
@@ -332,6 +361,7 @@
       if (rupee) { const d = Math.round((c.price * 0.1 * rupee) / 5) * 5 || 5 * Math.sign(rupee); total += d; mods.push(`${rupee > 0 ? '🚀' : '📉'} ${d > 0 ? '+' : ''}${d}`); }
       const nd = newsMove(s, c);
       if (nd) { total += nd; mods.push(`📰 ${nd > 0 ? '+' : ''}${nd}`); }
+      if (ev === 'FRENZY' && total) { total *= 2; mods.push('🔔 ×2'); }
       if (on('HYPE') && total > 0) { total *= 3; mods.push('📱 ×3'); }
       if (on('PANIC') && total < 0) { total *= 3; mods.push('😱 ×3'); }
       if (on('FLIP') && total) { total = -total; mods.push('🪞 flipped'); }
@@ -343,7 +373,7 @@
       let to = Math.max(0, from + total);
       const row = { tk: c.tk, name: c.name, color: c.color, mark: c.mark, from, to, total, cards, mods, note: '' };
 
-      const div = (on('DIVIDEND') ? R.dividend : 0) + (on('MEGADIV') ? 15 : 0) + (s.news && s.news.dividend || 0);
+      const div = (on('DIVIDEND') ? R.dividend : 0) + (on('MEGADIV') ? 15 : 0) + (ev === 'DIVFEST' ? 5 : 0) + (s.news && s.news.dividend || 0);
       if (div) {
         for (const p of s.players) if (p.hold[c.tk]) { p.cash += p.hold[c.tk] * div; trade(s, p, 'div', c.tk, p.hold[c.tk], div); }
         row.note = `💰 Dividend ₹${div}/share paid`;
@@ -373,7 +403,7 @@
         }
       }
       if (to <= 0) {
-        c.status = 'bankrupt';
+        c.status = 'bankrupt'; c.boss = null;
         for (const p of s.players) { delete p.hold[c.tk]; if (p.cost) delete p.cost[c.tk]; }
         row.note = '💥 BANKRUPT! All shares wiped out';
         log(s, `${c.name} went bankrupt. Every share is gone!`, 'down');
@@ -398,10 +428,24 @@
 
     // bank: deposits earn, loans cost, and too much debt triggers a margin call
     for (const p of s.players) {
-      if (p.fd > 0) { const i = Math.round(p.fd * R.fdRate); p.fd += i; }
+      const hol = s.event && s.event.id === 'BANKHOL';
+      if (p.fd > 0) { const i = Math.round(p.fd * (hol ? 0.1 : R.fdRate)); p.fd += i; }
       if (p.fd > 0 && s.plays.some((x) => x.sp === 'GOLDFD' && x.pid === p.id)) { const g = Math.round(p.fd * 0.15); p.fd += g; events.push(`🏦 ${p.avatar} ${p.name}'s Golden Deposit earned ₹${fmt(g)}.`); }
-      if (p.loan > 0) { const i = Math.round(p.loan * R.loanRate); p.loan += i; }
+      if (p.loan > 0 && !hol) { const i = Math.round(p.loan * R.loanRate); p.loan += i; }
       marginCall(s, p, events);
+    }
+
+    // takeover bosses earn a share of the company's value, and lose control if they sell down
+    for (const c of s.companies) {
+      if (!c.boss) continue;
+      const b = player(s, c.boss);
+      const sup = c.supply || R.supply;
+      if (!b || !live(c) || (b.hold[c.tk] || 0) < sup * R.keepControl) {
+        if (b) events.push(`🦈 ${b.avatar} ${b.name} lost control of ${c.tk}.`);
+        c.boss = null; continue;
+      }
+      const amt = Math.round(c.price * sup * R.bossProfit / 1000) * 1000;
+      if (amt > 0) { b.cash += amt; trade(s, b, 'div', c.tk, 0, amt, 'boss profit'); events.push(`🦈 ${b.avatar} ${b.name} earned ₹${fmt(amt)} as boss of ${c.tk}.`); }
     }
 
     for (const x of s.plays) {
@@ -431,6 +475,19 @@
       pl[p.id] = w - before[p.id];
       cash[p.id] = p.cash - cashBefore[p.id];
     }
+    const done = [];
+    for (const p of s.players) {
+      for (const m of p.missions || []) {
+        if (m.done || !missionMet(s, p, m.id, before[p.id])) continue;
+        m.done = true;
+        const def = BR.MISSIONS[m.id];
+        const amt = Math.round(Math.max(s.settings.startCash, p.worth[0]) * def.x / 1000) * 1000;
+        p.cash += amt; m.paid = amt;
+        done.push({ pid: p.id, id: m.id, amt });
+        events.push(`🎯 ${p.avatar} ${p.name} completed a secret mission: ${def.icon} ${def.name} (+₹${fmt(amt)})`);
+        trade(s, p, 'div', null, 0, amt, 'mission bonus');
+      }
+    }
     rows.sort((a, b) => b.total - a.total);
     // bots sometimes react to a big win or loss
     for (const p of s.players) {
@@ -439,7 +496,7 @@
       s.reactN = (s.reactN || 0) + 1;
       p.react = { i: opts[Math.floor(rnd(s) * opts.length)], n: s.reactN };
     }
-    s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice(), titles };
+    s.reveal = { round: s.round, rows, events, pl, cash, plays: s.plays.slice(), titles, missions: done };
     log(s, `Round ${s.round} revealed! Biggest mover: ${rows[0] ? rows[0].name : '-'}.`, 'sys');
 
     if (lastRound(s)) endGame(s);
@@ -449,6 +506,26 @@
       for (const p of s.players) p.ready = !!p.bot;
     }
     s.v++;
+  }
+
+  function missionMet(s, p, id, before) {
+    const w = netWorth(s, p), start = p.worth[0] || s.settings.startCash;
+    const held = Object.keys(p.hold).map((tk) => company(s, tk)).filter((c) => c && live(c));
+    switch (id) {
+      case 'OWNER': return held.some((c) => { const o = ownerOf(s, c); return o && o.p.id === p.id && o.rank === 'owner'; });
+      case 'DIVERSE': return held.length >= 5;
+      case 'DOUBLE': return w >= start * 2;
+      case 'BIGROUND': return before > 0 && w >= before * 1.25;
+      case 'CASH': return p.cash >= start * 1.5;
+      case 'FD': return p.fd >= start * 0.5;
+      case 'GOLD3': return (p.goldPlayed || 0) >= 3;
+      case 'IPO': return (p.ipoWins || 0) > 0;
+      case 'FOUND': return !!p.founded;
+      case 'BOSS': return s.companies.some((c) => c.boss === p.id);
+      case 'LOAN': return p.everLoan && !p.loan;
+      case 'BAGGER': return held.some((c) => { const a = avgCost(p, c.tk); return a > 0 && c.price >= a * 2; });
+    }
+    return false;
   }
 
   function newsMove(s, c) {
@@ -576,6 +653,7 @@
         trade(s, p, 'gold', null, 0, 0, '🤫 a secret card');
       }
       if (!s.plays.some((x) => x.card === k.id)) s.plays.push({ sp: k.sp, tk: c ? c.tk : null, who: p.name, pid: p.id, secret: true, done: true, card: k.id });
+      p.goldPlayed = (p.goldPlayed || 0) + 1;
       log(s, `🤫 ${p.name} played a secret card. Find out at the reveal!`, 'corp');
       p.gold.splice(i, 1);
       return 'turn';
@@ -598,6 +676,37 @@
       log(s, `🏢 ${p.avatar} ${p.name} founded ${name}! Its IPO opens next round at ₹${issue}.`, 'ipo');
       return 'turn';
     },
+    takeover(s, p, a) {
+      const c = company(s, a.tk);
+      if (!c || !live(c)) return 'That company is not trading';
+      if (c.boss === p.id) return 'You already control it';
+      const need = Math.ceil((c.supply || R.supply) * R.takeoverAt);
+      if ((p.hold[c.tk] || 0) < need) return `Own ${fmt(need)} shares (half the company) first`;
+      c.boss = p.id; c.bossSince = s.round;
+      trade(s, p, 'takeover', c.tk, 0, 0, 'took control');
+      log(s, `🦈 ${p.avatar} ${p.name} took over ${c.name}! They earn its profit every round.`, 'ipo');
+      return 'turn';
+    },
+    hostile(s, p, a) {
+      const c = company(s, a.tk);
+      if (!c || !live(c) || !c.boss) return 'Nobody controls that company';
+      if (c.boss === p.id) return 'You already control it';
+      if (s.round <= (c.bossSince || 0)) return 'Wait a round before bidding for it';
+      const sup = c.supply || R.supply;
+      if ((p.hold[c.tk] || 0) < sup * R.hostileAt) return `Own ${fmt(Math.ceil(sup * R.hostileAt))} shares to make a bid`;
+      const b = player(s, c.boss);
+      const q = (b && b.hold[c.tk]) || 0;
+      const px = Math.ceil(c.price * R.hostilePremium);
+      if (q * px > p.cash) return `The bid needs ₹${fmt(q * px)} in cash`;
+      p.cash -= q * px; b.cash += q * px;
+      delete b.hold[c.tk]; shrinkCost(b, c.tk, q);
+      p.hold[c.tk] = (p.hold[c.tk] || 0) + q; addCost(p, c.tk, q * px);
+      c.boss = p.id; c.bossSince = s.round;
+      trade(s, p, 'takeover', c.tk, q, px, `hostile bid on ${b.name}`);
+      trade(s, b, 'sell', c.tk, q, px, 'bought out');
+      log(s, `🦈 HOSTILE TAKEOVER! ${p.avatar} ${p.name} bought out ${b.name}'s ${c.tk} stake at ₹${px} and now runs ${c.name}!`, 'ipo');
+      return 'turn';
+    },
     react(s, p, a) {
       const i = Math.floor(a.i);
       if (!(i >= 0 && i < BR.REACTS.length)) return 'Unknown reaction';
@@ -609,7 +718,7 @@
     loan(s, p, a) {
       const amt = Math.min(Math.floor(a.amt || R.loanStep), loanLimit(s, p));
       if (!(amt > 0)) return 'The bank will not lend you more right now';
-      p.loan += amt; p.cash += amt;
+      p.loan += amt; p.cash += amt; p.everLoan = true;
       trade(s, p, 'loan', null, 0, amt);
       return null;
     },
@@ -657,7 +766,7 @@
       return null;
     },
   };
-  const TURN_ACTIONS = ['buy', 'sell', 'ipo', 'special', 'found', 'pass'];
+  const TURN_ACTIONS = ['buy', 'sell', 'ipo', 'special', 'found', 'takeover', 'hostile', 'pass'];
   function ticker(s, name) {
     const taken = new Set(s.companies.map((c) => c.tk).concat(s.ipoDefs.map((d) => d.tk), (s.foundQueue || []).map((d) => d.tk)));
     let base = (name.toUpperCase().replace(/[^A-Z]/g, '') + 'XXXX').slice(0, 4);
@@ -666,6 +775,14 @@
   }
   // the next company a player may found (null once they own three)
   function nextEmpire(p) { return R.empire[(p.founds || (p.founded ? [p.founded] : [])).length] || null; }
+  // 'takeover' when you can take control, 'hostile' when you can buy out the boss, else null
+  function takeoverMove(s, p, c) {
+    if (!c || !live(c) || s.phase !== 'turns' || c.boss === p.id) return null;
+    const sup = c.supply || R.supply, q = p.hold[c.tk] || 0;
+    if (q >= Math.ceil(sup * R.takeoverAt)) return 'takeover';
+    if (c.boss && s.round > (c.bossSince || 0) && q >= sup * R.hostileAt) return 'hostile';
+    return null;
+  }
   function canFound(s, p) {
     const e = nextEmpire(p);
     return !!e && s.phase === 'turns' && !lastRound(s) && s.companies.length + (s.foundQueue || []).length < R.maxCompanies && netWorth(s, p) >= e.at && p.cash >= e.fee;
@@ -784,11 +901,11 @@
     for (const p of v.players) {
       p.handCount = p.hand.length;
       p.goldCount = p.gold.length;
-      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; p.tip = null; }
+      if (p.id !== pid) { p.hand = []; p.gold = []; p.spy = null; p.tip = null; p.missions = (p.missions || []).map((m) => (m.done ? m : { id: null, done: false })); }
     }
     v.plays = v.plays.filter((x) => !x.secret || x.pid === pid);
     return v;
   };
 
-  BR.util = { newsMove, canFound, nextEmpire, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
+  BR.util = { newsMove, canFound, nextEmpire, takeoverMove, avgCost, available, ownerOf, netWorth, holdingsValue, loanLimit, maxBlocks, company, player, current, fmt, rnd, pick, priceOf };
 })(window.BR = window.BR || {});

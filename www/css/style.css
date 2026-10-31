@@ -635,3 +635,8 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .tut.end { pointer-events: auto; background: rgba(10, 16, 32, .55); } .tut.end .tut-bub { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
 @media (max-height: 430px) { .tut-bub { padding: 8px 12px; width: min(560px, 94vw); } .tut-bub p { font-size: 13px; } .tut-av { font-size: 24px; } }
 .hdr-learn { margin-left: auto; }
+/* v6.8 event rounds, missions, takeovers */
+.news-line.ev { background: #efe4ff; color: #3b1d6e; }
+.prow.mis small { white-space: normal; }
+.prow.mis.done { background: #eafbf1; border-radius: 10px; }
+.tg-right > .btn.gold { width: 100%; margin-top: 6px; font-size: 13px; }
