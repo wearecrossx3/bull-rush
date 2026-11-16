@@ -379,7 +379,7 @@
     const sel = typeof st.at === 'function' ? st.at(v) : st.at;
     const t = sel && $(sel);
     const ring = box.querySelector('.tut-ring');
-    UI.tutAllow = sel ? [sel, st.allow].filter(Boolean) : null;
+    UI.tutAllow = sel ? [sel, st.allow, '#rev-skip'].filter(Boolean) : null;
     if (t) {
       const r = t.getBoundingClientRect(), pad = 6;
       Object.assign(ring.style, { display: 'block', left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
@@ -1068,7 +1068,7 @@
   // ---------------------------------------------------------------- modals
   function openModal(kind, html, narrow) {
     UI.modal = kind;
-    $$('#fx .bubble').forEach((b) => b.remove());
+    $$('#fx .bubble, .coach.hint').forEach((b) => b.remove());
     $('#modal-card').className = 'modal-card' + (narrow ? ' narrow' : '') + ' m-' + kind;
     $('#modal-card').innerHTML = html;
     $('#modal').classList.remove('hidden');

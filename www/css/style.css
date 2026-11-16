@@ -640,3 +640,7 @@ body { background: #eef1f6 radial-gradient(rgba(120, 135, 165, .18) 1px, transpa
 .prow.mis small { white-space: normal; }
 .prow.mis.done { background: #eafbf1; border-radius: 10px; }
 .tg-right > .btn.gold { width: 100%; margin-top: 6px; font-size: 13px; }
+/* v6.9 polish: avatar chips never squash their emoji, and the top bar drops its dots when space is tight */
+.chip.av { flex: none; padding: 3px 6px; line-height: 1.25; }
+.tb-turn .dots { display: none; }
+.act-btns { flex-wrap: wrap; } .act-btns .btn { flex: 1 1 auto; min-width: max-content; white-space: nowrap; padding-left: 10px; padding-right: 10px; }
